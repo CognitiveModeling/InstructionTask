@@ -1,6 +1,7 @@
 import math
 import scipy.special as scsp
 import numpy as np
+import sim
 
 class Gauss:
     def __init__(self, mean, variance):
@@ -31,3 +32,21 @@ class Gauss:
             return 1-p
         else:
             return p
+
+
+def get_cos(sin):
+    if sin > 1:
+        sub = 1 - sin
+        sin = 1 - sub
+    if sin < -1:
+        sub = -1 - sin
+        sin = -1 + sub
+    if sin < 0:
+        choice = np.array([math.asin(sin), - math.pi - math.asin(sin)])
+    else:
+        choice = np.array([math.asin(sin), math.pi - math.asin(sin)])
+
+    x = np.random.choice(choice)
+
+    return math.cos(x)
+

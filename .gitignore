@@ -1,0 +1,6 @@
+*.json
+!states_relative.json
+!positions_relative.json
+!agents_relative.json
+!test_states_relative.json
+arrangements_relative/*
