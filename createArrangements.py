@@ -58,7 +58,7 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(0, 5000))
+    even_list = list(range(1400, 5000))
 
     for j in even_list:
         print(j)
@@ -274,7 +274,7 @@ if clientID!=-1:
 
         arrangement.append(list(timestep))
 
-        with open("arrangement" + str(j) + ".json", 'w') as f:
+        with open("arrangements_relative/arrangement" + str(j) + ".json", 'w') as f:
             json.dump(list(arrangement), f, indent=2)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 

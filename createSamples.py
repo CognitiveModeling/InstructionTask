@@ -4,7 +4,7 @@ import random
 import torch
 import math
 
-r = list(range(0, 2400))
+r = list(range(4900, 5000))
 #random.shuffle(r)
 
 n_agents = 3
@@ -106,13 +106,13 @@ for i in r:
 
 print(counter)
 
-with open("states_relative.json", 'w') as f:
+with open("test_states_relative.json", 'w') as f:
             json.dump(states, f, indent=2)
 
-with open("positions_relative.json", 'w') as f:
+with open("test_positions_relative.json", 'w') as f:
             json.dump(positions, f, indent=2)
 
-with open("agents_relative.json", 'w') as f:
+with open("test_agents_relative.json", 'w') as f:
             json.dump(agents, f, indent=2)
 
 

@@ -13,11 +13,11 @@ with open('agents_relative.json') as json_file:
 
 n_samples = len(states)
 
-states = torch.FloatTensor(states)
-positions = torch.FloatTensor(positions)
-agents = torch.FloatTensor(agents)
+states = torch.FloatTensor(states).to(device="cuda")
+positions = torch.FloatTensor(positions).to(device="cuda")
+agents = torch.FloatTensor(agents).to(device="cuda")
 
-batch_sz = 1
+batch_sz = 20
 n_actions = 3
 block_sz = 26 * n_actions
 n_states = n_actions + 1
@@ -26,7 +26,7 @@ n_orientations = 11
 action_size = n_positions + n_orientations
 n_agents = 3
 
-net = net.Net(batch_sz, n_agents, n_actions)
+net = net.Net(batch_sz, n_agents, n_actions).to(device="cuda")
 hidden = net.init()
 
 optimizer = torch.optim.Adam(net.parameters(), lr=0.0001)
@@ -34,12 +34,13 @@ optimizer = torch.optim.Adam(net.parameters(), lr=0.0001)
 states = torch.stack(torch.split(states, 1), dim=2)# nach Aktionsreihenfolgen geordnet
 states = states.view(n_states, int(n_samples/batch_sz), batch_sz, block_sz)
 # sorted: (action nr, batch nr, batch, blocks)
-positions = positions.view(int(n_samples/batch_sz), n_actions, action_size)
+#positions = positions.view(batch_sz, int(n_samples/batch_sz), n_actions, action_size)
+#print(positions)
 positions = torch.stack(torch.split(positions, 1), dim=2)
 positions = positions.view(n_actions, int(n_samples/batch_sz), batch_sz, action_size)
 agents = torch.stack(torch.split(agents, 1), dim=2)
 agents = agents.view(n_actions, int(n_samples/batch_sz), batch_sz, 1)
-blocks = torch.zeros([n_actions, int(n_samples/batch_sz), batch_sz, n_agents])
+blocks = torch.zeros([n_actions, int(n_samples/batch_sz), batch_sz, n_agents]).to(device="cuda")
 for i in range(n_actions):
     for j in range(int(n_samples/batch_sz)):
         for k in range(batch_sz):
@@ -48,7 +49,7 @@ for i in range(n_actions):
 
 batches = list(range(int(n_samples/batch_sz)))
 
-for epoch in range(3000):
+for epoch in range(6000):
     random.shuffle(batches)
     losses = []
 
@@ -67,7 +68,6 @@ for epoch in range(3000):
             loss = net.loss(out, states[idx + 1, i_batch, :, :])
 
             current_losses.append(loss)
-
         batch_loss = torch.cat([e for e in current_losses], -1)
 
         batch_loss = batch_loss.mean()
@@ -83,7 +83,7 @@ for epoch in range(3000):
 
     print(str(epoch) + ": " + str(mean_loss))
 
-    PATH = "state_dict_model_relative_2950samples_hidden128.pt"
+    PATH = "state_dict_model_relative_4900samples_hidden128.pt"
 
     # Save
     torch.save(net.state_dict(), PATH)

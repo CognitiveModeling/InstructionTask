@@ -22,15 +22,15 @@ class Net(nn.Module):
         self.batch_sz = batch_sz
 
         # network
-        self.l1 = nn.Linear(self.n_state, self.mid_dim)
-        self.L2 = nn.Linear(self.mid_dim + self.n_blocks, self.mid_dim)
-        self.l3 = nn.LSTM(self.mid_dim + self.n_position + self.n_orientation, self.mid_dim, self.n_lstm_layers)
-        self.l4 = nn.Linear(self.mid_dim, self.n_state)
+        self.l1 = nn.Linear(self.n_state, self.mid_dim).to(device="cuda")
+        self.L2 = nn.Linear(self.mid_dim + self.n_blocks, self.mid_dim).to(device="cuda")
+        self.l3 = nn.LSTM(self.mid_dim + self.n_position + self.n_orientation, self.mid_dim, self.n_lstm_layers).to(device="cuda")
+        self.l4 = nn.Linear(self.mid_dim, self.n_state).to(device="cuda")
 
     def init(self):
         # initialze hidden state
-        hidden_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim)
-        cell_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim)
+        hidden_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim).to(device="cuda")
+        cell_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim).to(device="cuda")
         hidden = (hidden_state, cell_state)
 
         return hidden

@@ -33,7 +33,7 @@ if clientID != -1:
     n_states = n_blocks + 1
     seq_len = n_blocks
 
-    for idx in range(50):
+    for idx in range(19, 72):
         with open('test_states_relative.json') as json_file:
             target_states = json.load(json_file)
         with open('test_agents_relative.json') as json_file:
@@ -70,10 +70,10 @@ if clientID != -1:
             first_block = target_blocks[idx][0][0]
 
             if target:
-                state_sz = 21
+                state_sz = 26
                 n_blocks = 3
                 block_sz = state_sz * n_blocks
-                n_position = 14
+                n_position = 19
                 states = target_states[idx, n_blocks, :]
             else:
                 states = ai_states[0, 0, :]
@@ -152,6 +152,11 @@ if clientID != -1:
                     o4 = states[state_sz * i_shape + 18]
                     o5 = states[state_sz * i_shape + 19]
                     o6 = states[state_sz * i_shape + 20]
+                    o7 = states[state_sz * i_shape + 21]
+                    o8 = states[state_sz * i_shape + 22]
+                    o9 = states[state_sz * i_shape + 23]
+                    o10 = states[state_sz * i_shape + 24]
+                    o11 = states[state_sz * i_shape + 25]
                 else:
                     o1 = states[state_sz * i_shape + 10]
                     o2 = states[state_sz * i_shape + 11]
@@ -166,7 +171,7 @@ if clientID != -1:
                     shapeslist[i_shape].setOrientation([o1, o2, o3, o4, o5, o6])
                     shapeslist[i_shape].setPosition_eval([p1, p2, p3], [])
                 else:
-                    shapeslist[i_shape].setOrientation([o1, o2, o3, o4, o5, o6])
+                    shapeslist[i_shape].setVisualOrientation([o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11])
                     time.sleep(1)
                     shapeslist[i_shape].setPosition_eval_from_relativePosition([p1, p2, p3, p4, p5], shapeslist[first_block], p6, p7, p8, [])
             input()

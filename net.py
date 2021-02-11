@@ -29,8 +29,8 @@ class Net(nn.Module):
 
     def init(self):
         # initialze hidden state
-        hidden_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim)
-        cell_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim)
+        hidden_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim).to(device="cuda")
+        cell_state = torch.randn(self.n_lstm_layers, self.batch_sz, self.mid_dim).to(device="cuda")
         hidden = (hidden_state, cell_state)
 
         return hidden
