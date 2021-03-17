@@ -58,14 +58,14 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(1400, 5000))
+    even_list = list(range(4408, 5000))
 
     for j in even_list:
         print(j)
 
         shapeslist = []
         rands = np.random.randint(3, size=n_blocks)
-        actionChoices = np.random.randint(8, size=n_actions)
+        actionChoices = np.random.randint(12, size=n_actions)
         cu = 0
         cy = 0
         s = 0
@@ -228,7 +228,7 @@ if clientID!=-1:
                 shapeslist[order[a]].moveTo(fx, fy, [])
                 #orientation = list([o1, o2, o3, o4, o5, o6])
                 #print(list([o1, o2, o3, o4, o5, o6]))
-                orientation = shapeslist[order[a]].getOrientationType()
+                #orientation = shapeslist[order[a]].getOrientationType()
                 #print(orientation)
                 position = [0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -241,15 +241,19 @@ if clientID!=-1:
                                         facing_choices[0], facing_choices[1], facing_choices[2]])
                 #sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
                 #orientation = list([o1, o2, o3, o4, o5, o6])
-                orientation = shapeslist[order[a]].getOrientationType()
+                #orientation = shapeslist[order[a]].getOrientationType()
                 position = shapeslist[order[a]].performRandomActionVariable(shapeslist[order[0]], actionChoices[a], leftright, frontback, withoutAll[order[a]])
                 #position = shapeslist[order[a]].performRandomActionVariable(shapeslist[order[0]], 3, leftright, frontback, withoutAll[order[a]])
 
-            time.sleep(2)
+            time.sleep(1)
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
             time.sleep(3)
 
             sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
+            #getting final orientation as target orientation
+            orientation = shapeslist[order[a]].getOrientationType()
+            abs_pos = shapeslist[order[a]].getPosition()
+            position = shapeslist[order[a]].getRelativePosition(shapeslist[order[0]], abs_pos, False)
 
             properties = []
             properties.append([order[a]])

@@ -30,7 +30,7 @@ timesteps = seq_len
 batch_sz = 1
 n_states = seq_len + 1
 
-random_tests = 200000
+random_tests = 1
 
 states = torch.FloatTensor(states).to(device="cuda")
 positions = torch.FloatTensor(positions).to(device="cuda")
@@ -53,7 +53,7 @@ for i in range(seq_len):
 if not os.path.exists('eval_results'):
         os.makedirs('eval_results')
 
-PATH = "state_dict_model_relative_4680samples_hidden128.pt"
+PATH = "state_dict_model_relative_4900samples_hidden128.pt"
 
 net = net_test.Net(batch_sz, n_blocks, timesteps)
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
@@ -117,115 +117,9 @@ if clientID!=-1:
         state = states[0, i_batch, :, :]
         state = state.view(1, batch_sz, block_sz)
 
-        target = states[timesteps, i_batch, :, :]
-        target = target.view(1, batch_sz, block_sz)
-
-        current_loss = 1000
-
-        for trial in range(random_tests):
-
-            actionsequence = torch.zeros([seq_len, batch_sz, n_positions]).to(device="cuda")
-            blocks_choice = torch.zeros([seq_len, batch_sz, n_blocks]).to(device="cuda")
-
-            all_blocks = list(range(3))
-
-            if trial % 10000 == 0:
-                print("test trial " + str(trial))
-                print("current loss: " + str(current_loss))
-
-            for idx in range(seq_len):
-                for b in range(batch_sz):
-                    po = torch.zeros([batch_sz, n_positions]).to(device="cuda")
-
-                    p = np.random.randint(0, 5)
-
-                    p1 = np.random.uniform(-0.3, 0.3)
-                    p2 = np.random.uniform(-0.3, 0.3)
-                    p3 = np.random.uniform(-0.3, 0.3)
-
-                    current_block = torch.zeros([batch_sz, n_blocks])
-                    block_choice = np.random.choice(all_blocks)
-                    all_blocks.remove(block_choice)
-                    current_block[b, block_choice] = 1
-                    current_block = current_block.view(1, batch_sz, n_blocks).to(device="cuda")
-
-                    orientation_type = [0, 0, 0, 0, 0, 0, 0, 0]
-                    facing_choices = [0, 0, 0]
-
-                    type_choice = np.random.randint(0, 8)
-
-                    orientation_type[type_choice] = 1
-
-                    if type_choice == 0 or type_choice == 1 or type_choice == 2:
-                        facing_choices[0] = np.random.uniform(- math.pi / 2, math.pi / 2)
-                    elif type_choice == 3 or type_choice == 4 or type_choice == 5:
-                        facing_choices[0] = np.random.uniform(- math.pi / 2, math.pi / 2)
-                        facing = [1, 2]
-                        facing_choice = np.random.choice(facing)
-                        facing_choices[facing_choice] = 1
-                    else:
-                        num = [1, 2]
-                        num_choice = np.random.choice(num)
-                        facing = [0, 1, 2]
-
-                        facing_choice = np.random.choice(facing, num_choice)
-
-                        if num_choice == 2:
-                            facing_choices[facing_choice[0]] = 1
-                            facing_choices[facing_choice[1]] = 1
-                        else:
-                            facing_choices[facing_choice[0]] = 1
-
-                    if idx == 0:
-                        po[b] = torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 0:
-                        po[b] = torch.tensor([1, 0, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 1:
-                        po[b] = torch.tensor([0, 1, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 2:
-                        po[b] = torch.tensor([0, 0, 1, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 3:
-                        po[b] = torch.tensor([0, 0, 0, 1, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    else:
-                        po[b] = torch.tensor([0, 0, 0, 0, 1, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-
-                po = po.view(1, batch_sz, n_positions).to(device="cuda")
-                actionsequence[idx] = po
-                blocks_choice[idx] = current_block
-
-                state, hidden = net(state, current_block, po, hidden)
-
-                state = state.to(device="cuda")
-
-                del po
-                del current_block
-
-            loss = net.loss(state, target.view(1, batch_sz, block_sz))
-
-            if loss.mean() < current_loss:
-                current_loss = loss.mean().to(device="cuda")
-                current_full_loss = loss.clone().to(device="cuda")
-                current_actionsequence = actionsequence.clone().to(device="cuda")
-                current_best_blocks = blocks_choice.clone().to(device="cuda")
-
-            del actionsequence
-            del block_choice
-            del loss
-
-        first_block = torch.argmax(current_best_blocks[0]).item().to(device="cuda")
-        sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
+        #target = states[timesteps, i_batch, :, :]
+        #target = target.view(1, batch_sz, block_sz)
+        target = states[:, i_batch, :, :]
 
         for b in range(batch_sz):
             for i in range(n_blocks):
@@ -275,27 +169,188 @@ if clientID!=-1:
                 shape.scaleShape(x, y, z)
 
                 shape.setColor(r, g, b1)
-            for idx in range(seq_len):
 
-                new_position = current_actionsequence[idx].view(n_positions)
-                new_block = current_best_blocks[idx].view(n_blocks)
+        all_blocks = list(range(3))
 
-                block_nr = int(torch.argmax(new_block))
-                pos = torch.narrow(new_position, 0, 0, 5)
-                leftright = torch.narrow(new_position, 0, 5, 1)
-                frontback = torch.narrow(new_position, 0, 6, 1)
-                ort = torch.narrow(new_position, 0, 8, 11)
+        for idx in range(seq_len):
+            print(idx)
+            current_loss = 1000
+            if idx != 0:
+                for bl in range(0, n_blocks):
+                    p_help = shapeslist[bl].getPosition()
+                    p = shapeslist[bl].getRelativePosition(shapeslist[first_block], p_help, False)
+                    o = shapeslist[bl].getOrientationType()
+                    c = shapeslist[bl].getColor()
+                    bb = shapeslist[bl].getBoundingBox()
+                    t = shapeslist[bl].getType()
 
-                sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
-                op = shapeslist[block_nr].getPosition()
-                shapeslist[block_nr].moveTo(2, 2, [])
-                shapeslist[block_nr].setVisualOrientation(ort)
+                    state[0][0][bl * state_sz] = t
+                    state[0][0][bl * state_sz + 1] = c[0]
+                    state[0][0][bl * state_sz + 2] = c[1]
+                    state[0][0][bl * state_sz + 3] = c[2]
+                    state[0][0][bl * state_sz + 4] = bb[0]
+                    state[0][0][bl * state_sz + 5] = bb[1]
+                    state[0][0][bl * state_sz + 6] = bb[2]
+                    state[0][0][bl * state_sz + 7] = p[0]
+                    state[0][0][bl * state_sz + 8] = p[1]
+                    state[0][0][bl * state_sz + 9] = p[2]
+                    state[0][0][bl * state_sz + 10] = p[3]
+                    state[0][0][bl * state_sz + 11] = p[4]
+                    state[0][0][bl * state_sz + 12] = p[5]
+                    state[0][0][bl * state_sz + 13] = p[6]
+                    state[0][0][bl * state_sz + 14] = p[7]
+                    state[0][0][bl * state_sz + 15] = o[0]
+                    state[0][0][bl * state_sz + 16] = o[1]
+                    state[0][0][bl * state_sz + 17] = o[2]
+                    state[0][0][bl * state_sz + 18] = o[3]
+                    state[0][0][bl * state_sz + 19] = o[4]
+                    state[0][0][bl * state_sz + 20] = o[5]
+                    state[0][0][bl * state_sz + 21] = o[6]
+                    state[0][0][bl * state_sz + 22] = o[7]
+                    state[0][0][bl * state_sz + 23] = o[8]
+                    state[0][0][bl * state_sz + 24] = o[9]
+                    state[0][0][bl * state_sz + 25] = o[10]
+            for b in range(batch_sz):
 
-                shapeslist[block_nr].set_relative_position(pos, shapeslist[first_block], leftright, frontback, withoutAll[block_nr])
+                #print(state)
+                #print(target)
 
-                sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-                time.sleep(8)
-                #sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
+                for trial in range(random_tests):
+
+                    # actionsequence = torch.zeros([seq_len, batch_sz, n_positions]).to(device="cuda")
+                    blocks_choice = torch.zeros([seq_len, batch_sz, n_blocks]).to(device="cuda")
+
+                    if trial % 10000 == 0:
+                        print("test trial " + str(trial))
+                        print("current loss: " + str(current_loss))
+                    po = torch.zeros([batch_sz, n_positions]).to(device="cuda")
+
+                    p = np.random.randint(0, 5)
+
+                    p1 = np.random.uniform(-0.3, 0.3)
+                    p2 = np.random.uniform(-0.3, 0.3)
+                    p3 = np.random.uniform(-0.3, 0.3)
+
+                    current_block = torch.zeros([batch_sz, n_blocks])
+                    block_choice = np.random.choice(all_blocks)
+                    #all_blocks.remove(block_choice)
+                    current_block[b, block_choice] = 1
+                    current_block = current_block.view(1, batch_sz, n_blocks).to(device="cuda")
+
+                    orientation_type = [0, 0, 0, 0, 0, 0, 0, 0]
+                    facing_choices = [0, 0, 0]
+
+                    type_choice = np.random.randint(0, 8)
+
+                    orientation_type[type_choice] = 1
+
+                    if type_choice == 0 or type_choice == 1 or type_choice == 2:
+                        facing_choices[0] = np.random.uniform(- 1, 1)
+                        facing_choices[1] = mathown.get_cos(facing_choices[0])
+                    elif type_choice == 3 or type_choice == 4 or type_choice == 5:
+                        facing_choices[0] = np.random.uniform(- 1, 1)
+                        facing_choices[1] = mathown.get_cos(facing_choices[0])
+                        facing = [0, 1]
+                        facing_choice = np.random.choice(facing)
+                        facing_choices[2] = facing_choice
+                    else:
+                        num = [1, 2]
+                        num_choice = np.random.choice(num)
+                        facing = [0, 1, 2]
+
+                        facing_choice = np.random.choice(facing, num_choice)
+
+                        if num_choice == 2:
+                            facing_choices[facing_choice[0]] = 1
+                            facing_choices[facing_choice[1]] = 1
+                        else:
+                            facing_choices[facing_choice[0]] = 1
+
+                    if idx == 0:
+                        po[b] = torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                    elif p == 0:
+                        po[b] = torch.tensor([1, 0, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                    elif p == 1:
+                        po[b] = torch.tensor([0, 1, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                    elif p == 2:
+                        po[b] = torch.tensor([0, 0, 1, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                    elif p == 3:
+                        po[b] = torch.tensor([0, 0, 0, 1, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                    else:
+                        po[b] = torch.tensor([0, 0, 0, 0, 1, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+                         facing_choices[0], facing_choices[1], facing_choices[2]])
+
+                    po = po.view(1, batch_sz, n_positions).to(device="cuda")
+                    #actionsequence[idx] = po
+                    #blocks_choice[idx] = current_block
+                    po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
+                    current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
+
+                    new_state, hidden = net(state, current_block, po, hidden)
+
+                    #state = state.to(device="cuda")
+
+                    #del po
+                    #del current_block
+
+                    loss = net.loss(new_state, target[idx + 1].view(1, batch_sz, block_sz))
+
+                    print("state: " + str(state))
+                    print("position: " + str(po))
+                    print("block: " + str(current_block))
+                    print("prediction: " + str(new_state))
+                    print("target " + str(target[idx + 1].view(1, batch_sz, block_sz)))
+                    print("loss: " + str(loss.mean()))
+
+                    if loss.mean() < current_loss:
+                        current_loss = loss.mean().to(device="cuda")
+                        current_full_loss = loss.clone().to(device="cuda")
+                        #current_actionsequence = actionsequence.clone().to(device="cuda")
+                        #current_best_blocks = blocks_choice.clone().to(device="cuda")
+                        current_action = po.to(device="cuda")
+                        current_best_block = current_block.to(device="cuda")
+                        current_block_choice = block_choice
+
+                all_blocks.remove(current_block_choice)
+
+            #del actionsequence
+            del block_choice
+            del loss
+
+            if idx == 0:
+                first_block = torch.argmax(current_best_block).item()
+            sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
+
+            new_position = current_action.view(n_positions)
+            new_block = current_best_block.view(n_blocks)
+
+            block_nr = int(torch.argmax(new_block))
+            pos = torch.narrow(new_position, 0, 0, 5)
+            leftright = torch.narrow(new_position, 0, 5, 1)
+            frontback = torch.narrow(new_position, 0, 6, 1)
+            ort = torch.narrow(new_position, 0, 8, 11)
+
+            sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
+            op = shapeslist[block_nr].getPosition()
+            shapeslist[block_nr].moveTo(2, 2, [])
+            shapeslist[block_nr].setVisualOrientation(ort)
+
+            shapeslist[block_nr].set_relative_position(pos, shapeslist[first_block], leftright, frontback, withoutAll[block_nr])
+
+            sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
+            time.sleep(8)
+            #sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
             for bl in range(0, n_blocks):
                 p_help = shapeslist[bl].getPosition()
@@ -333,26 +388,26 @@ if clientID!=-1:
                 state[0][0][bl * state_sz + 25] = o[10]
 
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-            loss = net.loss(state[0], target[0])
-            print(loss)
-            print(loss.mean())
-            #print("state: " + str(state[0]))
-            #print("target: " + str(target[0]))
+            loss = net.loss(state[0], target[timesteps])
+        print(loss)
+        print(loss.mean())
+        #print("state: " + str(state[0]))
+        #print("target: " + str(target[0]))
 
-            for shape in shapeslist:
-                properties = []
-                properties.append(shape.getType())
-                properties.append(list(shape.getColor()))
-                properties.append(list(shape.getBoundingBox()))
-                properties.append(list(shape.getPosition()))
-                properties.append(list(shape.getOrientation()))
+        for shape in shapeslist:
+            properties = []
+            properties.append(shape.getType())
+            properties.append(list(shape.getColor()))
+            properties.append(list(shape.getBoundingBox()))
+            properties.append(list(shape.getPosition()))
+            properties.append(list(shape.getOrientation()))
 
-                timestep.append(list(properties))
+            timestep.append(list(properties))
 
-            arrangement.append(list(timestep))
+        arrangement.append(list(timestep))
 
-            with open("ai3_result" + str(i_batch * batch_sz + b) + ".json", 'w') as f:
-                json.dump(list(arrangement), f, indent=2)
+        with open("ai3_result" + str(i_batch * batch_sz + b) + ".json", 'w') as f:
+            json.dump(list(arrangement), f, indent=2)
 
         for i in range(len(shapeslist)):
             #shapeslist[i].setPosition([i-4, 3, shapeslist[i].getPosition()[2]])
@@ -370,15 +425,15 @@ if clientID!=-1:
         del loss
         del state
         del target
-        del actionsequence
-        del agents
+        #del actionsequence
+        #del agents
         del blocks_target
-        del current_block
-        del current_best_blocks
-        del current_actionsequence
-        del current_full_loss
+        #del current_block
+        #del current_best_blocks
+        #del current_actionsequence
+        #del current_full_loss
         del new_position
-        del new_block
+        #del new_block
         del withoutAll
 
     '''

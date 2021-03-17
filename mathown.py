@@ -41,12 +41,13 @@ def get_cos(sin):
     if sin < -1:
         sub = -1 - sin
         sin = -1 + sub
-    if sin < 0:
-        choice = np.array([math.asin(sin), - math.pi - math.asin(sin)])
-    else:
-        choice = np.array([math.asin(sin), math.pi - math.asin(sin)])
+    #if sin < 0:
+    #    choice = np.array([math.asin(sin), - math.pi - math.asin(sin)])
+    #else:
+    #    choice = np.array([math.asin(sin), math.pi - math.asin(sin)])
 
-    x = np.random.choice(choice)
+    #x = np.random.choice(choice)
+    x = math.asin(sin)
 
     return math.cos(x)
 

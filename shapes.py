@@ -136,6 +136,8 @@ class Shape:
             type[8] = math.asin(largest_axis[1])
             if largest_axis[0] < 0:
                 type[8] = - type[8]
+            type[9] = math.cos(type[8])
+            type[8] = math.sin(type[8])
 
         else:
             edge, axis = self.isObjectonEdge(x, y, z)
@@ -157,6 +159,8 @@ class Shape:
                 type[8] = math.asin(l_axis[1])
                 if l_axis[0] < 0:
                     type[8] = - type[8]
+                type[9] = math.cos(type[8])
+                type[8] = math.sin(type[8])
 
                 larger = max(rest)
                 index_l = sbb.index(larger)
@@ -164,9 +168,9 @@ class Shape:
                 largest_axis = self.chooserightAxis(index_l, x, y, z)
 
                 if (largest_axis[1] > 0 and largest_axis[2] < 0) or (largest_axis[1] < 0 and largest_axis[2] > 0):
-                    type[9] = 1
-                else:
                     type[10] = 1
+                else:
+                    type[10] = 0
 
             else:
                 altX, altY, altZ = self.upwardfacingVectors(x, y, z)
@@ -411,6 +415,7 @@ class Shape:
         return position
 
     def set_relative_position(self, position, object, leftright, frontback, shapelist):
+        position = position.to(device="cpu")
         number = np.argmax(position)
         if number == 0:
             if position[0] == 0:
@@ -574,9 +579,9 @@ class Shape:
         m_index.remove(l_index)
         m_index.remove(s_index)
         m_index = int(m_index[0])
-        rotation = orientation[8]
+        rotation = math.asin(orientation[8])
         forwardfacing = False
-        if orientation[9] == 1:
+        if orientation[10] == 1:
             forwardfacing = True
 
         if orientation[3] == 1:
@@ -692,7 +697,7 @@ class Shape:
         m_index.remove(l_index)
         m_index.remove(s_index)
         m_index = int(m_index[0])
-        rotation = orientation[8]
+        rotation = math.asin(orientation[8])
 
         if orientation[0] == 1: #smallest axis orthogonal to bottom plane
             new_or = self.rotatePlaneOrientation(s_index, l_index, rotation)
