@@ -22,10 +22,12 @@ class Net(nn.Module):
         self.batch_sz = batch_sz
 
         # network
-        self.l1 = nn.Linear(self.n_state, self.mid_dim)
-        self.L2 = nn.Linear(self.mid_dim + self.n_blocks, self.mid_dim)
-        self.l3 = nn.LSTM(self.mid_dim + self.n_position + self.n_orientation, self.mid_dim, self.n_lstm_layers)
-        self.l4 = nn.Linear(self.mid_dim, self.n_state)
+        self.l1 = nn.Linear(self.n_state, self.n_state)
+        self.l2 = nn.Linear(self.n_position + self.n_orientation, self.n_state)
+        #self.l3 = nn.LSTM(self.mid_dim + self.n_position + self.n_orientation, self.mid_dim, self.n_lstm_layers)
+        self.l3 = nn.Linear(self.n_blocks, self.n_state)
+        self.l4 = nn.Linear(3 * self.n_state, self.n_state)
+        self.l5 = nn.Linear(self.n_state, self.n_state)
 
     def init(self):
         # initialze hidden state
@@ -35,21 +37,20 @@ class Net(nn.Module):
 
         return hidden
 
-    def forward(self, state, block, position, hidden):
-        out = torch.tanh(self.l1(state))
-        out = torch.cat((out, block), dim=-1)
-        #out = out.view(self.n_blocks * self.batch_sz, int(self.mid_dim/self.n_blocks))
-        #block = block.view(self.n_blocks * self.batch_sz, 1)
-        #out = out * block
-        #out = out.view(self.batch_sz, self.mid_dim)
-        out = torch.tanh(self.L2(out))
-        out = torch.cat((out, position), dim=-1)
+    def forward(self, state, block, position):
+        out1 = torch.tanh(self.l1(state))
+        out2 = torch.tanh(self.l2(position))
+        out3 = torch.tanh(self.l3(block))
+        #out = torch.cat((out, block), dim=-1)
+        #out2 = out2 * out3
+        out2 = torch.cat((out2, out3), dim = -1)
+        out = torch.cat((out1, out2), dim=-1)
         out = out.unsqueeze(0)
-        out, hidden = self.l3(out, hidden)
-        out = torch.tanh(out)
-        out = self.l4(out)
+        out = torch.tanh(self.l4(out))
+        out = self.l5(out)
+        out = state.detach() + out
 
-        return out, hidden
+        return out
 
     def loss(self, output, target):
 

@@ -30,7 +30,7 @@ timesteps = seq_len
 batch_sz = 1
 n_states = seq_len + 1
 
-random_tests = 1
+random_tests = 50000
 
 states = torch.FloatTensor(states).to(device="cuda")
 positions = torch.FloatTensor(positions).to(device="cuda")
@@ -53,13 +53,13 @@ for i in range(seq_len):
 if not os.path.exists('eval_results'):
         os.makedirs('eval_results')
 
-PATH = "state_dict_model_relative_4900samples_hidden128.pt"
+PATH = "state_dict_model_relative_additional_4550samples_new_reduced.pt"
 
-net = net_test.Net(batch_sz, n_blocks, timesteps)
+net = net_test.Net(batch_sz, n_blocks, timesteps).to(device="cuda")
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
 net.eval()
 
-hidden = net.init()
+#hidden = net.init()
 
 print ('Program started')
 sim.simxFinish(-1) # just in case, close all opened connections
@@ -85,7 +85,7 @@ if clientID!=-1:
         cy = 0
         s = 0
 
-        hidden = net.init()
+        #current_hidden = net.init()
 
         cuboid1 = shapes.Shape(clientID, "Cuboid", 0)
         cuboid2 = shapes.Shape(clientID, "Cuboid", 1)
@@ -115,7 +115,7 @@ if clientID!=-1:
         positions_target = positions[:, i_batch, :, :]
 
         state = states[0, i_batch, :, :]
-        state = state.view(1, batch_sz, block_sz)
+        state = state.view(1, batch_sz, block_sz).to(device="cuda")
 
         #target = states[timesteps, i_batch, :, :]
         #target = target.view(1, batch_sz, block_sz)
@@ -175,6 +175,11 @@ if clientID!=-1:
         for idx in range(seq_len):
             print(idx)
             current_loss = 1000
+
+            if idx == 1:
+                all_blocks.remove(first_block)
+
+            print(all_blocks)
             if idx != 0:
                 for bl in range(0, n_blocks):
                     p_help = shapeslist[bl].getPosition()
@@ -210,6 +215,10 @@ if clientID!=-1:
                     state[0][0][bl * state_sz + 23] = o[8]
                     state[0][0][bl * state_sz + 24] = o[9]
                     state[0][0][bl * state_sz + 25] = o[10]
+
+                    state = state.to(device="cuda")
+
+                #hidden = current_hidden
             for b in range(batch_sz):
 
                 #print(state)
@@ -294,24 +303,25 @@ if clientID!=-1:
                     po = po.view(1, batch_sz, n_positions).to(device="cuda")
                     #actionsequence[idx] = po
                     #blocks_choice[idx] = current_block
-                    po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
+                    #po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
+                    #if idx == 0:
                     current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
 
-                    new_state, hidden = net(state, current_block, po, hidden)
+                    new_state = net(state, current_block, po)
 
                     #state = state.to(device="cuda")
 
                     #del po
                     #del current_block
 
-                    loss = net.loss(new_state, target[idx + 1].view(1, batch_sz, block_sz))
+                    loss = net.loss(new_state, target[seq_len].view(1, batch_sz, block_sz))
 
-                    print("state: " + str(state))
-                    print("position: " + str(po))
-                    print("block: " + str(current_block))
-                    print("prediction: " + str(new_state))
-                    print("target " + str(target[idx + 1].view(1, batch_sz, block_sz)))
-                    print("loss: " + str(loss.mean()))
+                    #print("state: " + str(state))
+                    #print("position: " + str(po))
+                    #print("block: " + str(current_block))
+                    #print("prediction: " + str(new_state))
+                    #print("target " + str(target[idx + 1].view(1, batch_sz, block_sz)))
+                    #print("loss: " + str(loss.mean()))
 
                     if loss.mean() < current_loss:
                         current_loss = loss.mean().to(device="cuda")
@@ -321,8 +331,9 @@ if clientID!=-1:
                         current_action = po.to(device="cuda")
                         current_best_block = current_block.to(device="cuda")
                         current_block_choice = block_choice
+                        #current_hidden = new_hidden
 
-                all_blocks.remove(current_block_choice)
+                #all_blocks.remove(current_block_choice)
 
             #del actionsequence
             del block_choice

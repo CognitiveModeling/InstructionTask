@@ -5,6 +5,7 @@ import math
 import preferences
 import csv
 import numpy as np
+import d3g
 
 
 class Shape:
@@ -47,6 +48,28 @@ class Shape:
             return self.position
         else:
             return returnCode
+
+    def getEdgePoints(self, position):
+        x, y, z = self.getVectors()
+        bb = self.getBoundingBox()
+
+        x1 = self.vectorMultiplication(x, bb[0] * 0.5)
+        x2 = self.vectorNegation(x1)
+        y1 = self.vectorMultiplication(y, bb[1] * 0.5)
+        y2 = self.vectorNegation(y1)
+        z1 = self.vectorMultiplication(z, bb[2] * 0.5)
+        z2 = self.vectorNegation(z1)
+
+        p1 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x1, y1), z1), position)
+        p2 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x1, y1), z2), position)
+        p3 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x1, y2), z1), position)
+        p4 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x1, y2), z2), position)
+        p5 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x2, y1), z1), position)
+        p6 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x2, y1), z2), position)
+        p7 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x2, y2), z1), position)
+        p8 = self.vectorAddition(self.vectorAddition(self.vectorAddition(x2, y2), z2), position)
+
+        return p1, p2, p3, p4, p5, p6, p7, p8
 
     def getVelocity(self):
         returnCode, self.velocity = sim.simxGetObjectVelocity(self.clientID, self.handle, sim.simx_opmode_blocking)
@@ -240,20 +263,25 @@ class Shape:
         else:
             return 2
 
-    def getBoundingBoxWorld(self):
-        sbb = self.getBoundingBox()
+    def getVectors(self):
         o = self.getradianOrientation()
 
         ex = math.degrees(o[0])
         ey = math.degrees(o[1])
         ez = math.degrees(o[2])
 
-        r= R.from_euler('XYZ', [ex, ey, ez], degrees=True)
-        #r= R.from_rotvec(o)
+        r = R.from_euler('XYZ', [ex, ey, ez], degrees=True)
 
         x = self.getXvector(r)
         y = self.getYvector(r)
         z = self.getZvector(r)
+
+        return x, y, z
+
+    def getBoundingBoxWorld(self):
+        sbb = self.getBoundingBox()
+
+        x, y, z = self.getVectors()
 
         maxXvalue = self.maxXvalue(sbb, x, y, z)
         maxYvalue = self.maxYvalue(sbb, x, y, z)
@@ -380,11 +408,12 @@ class Shape:
     # "set" functions
     def setPosition(self, position, shapelist):
         bb = self.getBoundingBoxWorld()
-        inSpaceOf, shape = self.inSpaceOf(position, shapelist, bb)
+        #inSpaceOf, shape = self.inSpaceOf(position, shapelist, bb)
+        collision, shape = self.collision(position, shapelist, bb)
         belowGround = self.below_ground(position, bb)
         outOfBounds = self.outOfBounds(position)
-        while inSpaceOf or belowGround or outOfBounds:
-
+        while collision or belowGround or outOfBounds:
+        #while belowGround or outOfBounds:
             if outOfBounds:
                 print("out of bounds")
                 print(position)
@@ -396,17 +425,18 @@ class Shape:
                     position[1] = -2.4
                 elif position[1] > 2.5:
                     position[1] = 2.4
-            if inSpaceOf:
-                print("in space of")
+            if collision:
+                print("collision")
                 print(position)
-                position = [position[0], position[1], position[2] + 0.5]
+                sbb = shape.getBoundingBoxWorld()
+                position = [position[0], position[1], position[2] + sbb[2]]
             if belowGround:
                 print("below ground")
                 print(position)
                 print(bb)
-                position = [position[0], position[1], 1]
+                position = [position[0], position[1], bb[2]*0.5]
 
-            inSpaceOf, shape = self.inSpaceOf(position, shapelist, bb)
+            collision, shape = self.inSpaceOf(position, shapelist, bb)
             belowGround = self.below_ground(position, bb)
             outOfBounds = self.outOfBounds(position)
 
@@ -417,7 +447,9 @@ class Shape:
     def set_relative_position(self, position, object, leftright, frontback, shapelist):
         position = position.to(device="cpu")
         number = np.argmax(position)
-        if number == 0:
+        if self.sameObject(object.getPosition(), self.getPosition()):
+            self.moveTo(0, 0, shapelist)
+        elif number == 0:
             if position[0] == 0:
                 self.moveTo(0, 0, shapelist)
             else:
@@ -734,7 +766,7 @@ class Shape:
         return list(position)
 
     def moveTo(self, x, y, shapelist):
-        position = [x, y, 0.5]
+        position = [x, y, 1]
         position = self.setPosition(position, shapelist)
 
         return list(position)
@@ -875,6 +907,186 @@ class Shape:
         self.setOrientation([0, 1, 0, 1, self.getOrientation()[4], self.getOrientation()[5]])
 
     # helpers
+    def collision(self, position, shapelist, BB):
+        p1, p2, p3, p4, p5, p6, p7, p8 = self.getEdgePoints(position)
+        points = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+        plane1 = self.getPlane(p1, p5)
+        plane2 = self.getPlane(p1, p2)
+        plane3 = self.getPlane(p1, p3)
+
+        plane11 = self.getPlane(p8, p4)
+        plane21 = self.getPlane(p8, p7)
+        plane31 = self.getPlane(p8, p6)
+
+        planes = [[plane1, plane2, plane3, plane11, plane21, plane31], [[p1, p2, p3], [p1, p3, p5], [p1, p2, p5],
+                                                                        [p8, p7, p6], [p8, p4, p6], [p8, p4, p7]]]
+        #print(planes[0])
+        line1 = self.getLine(p1, p2)
+        line2 = self.getLine(p1, p5)
+        line3 = self.getLine(p5, p6)
+        line4 = self.getLine(p2, p6)
+        line5 = self.getLine(p3, p4)
+        line6 = self.getLine(p3, p7)
+        line7 = self.getLine(p7, p8)
+        line8 = self.getLine(p4, p8)
+        line9 = self.getLine(p5, p7)
+        line10 = self.getLine(p1, p6)
+        line11 = self.getLine(p2, p4)
+        line12 = self.getLine(p6, p8)
+
+        lines = [line1, line2, line3, line4, line5, line6, line7, line8, line9, line10, line11, line12]
+        #print(lines)
+        for obj in shapelist:
+            op1, op2, op3, op4, op5, op6, op7, op8 = obj.getEdgePoints(obj.getPosition())
+            opoints = [op1, op2, op3, op4, op5, op6, op7, op8]
+
+            oplane1 = self.getPlane(op1, op5)
+            oplane2 = self.getPlane(op1, op2)
+            oplane3 = self.getPlane(op1, op3)
+
+            oplane11 = self.getPlane(op8, op4)
+            oplane21 = self.getPlane(op8, op7)
+            oplane31 = self.getPlane(op8, op6)
+
+            oplanes = [[oplane1, oplane2, oplane3, oplane11, oplane21, oplane31], [[op1, op2, op3], [op1, op3, op5], [op1, op2, op5],
+                                                                            [op8, op7, op6], [op8, op4, op6], [op8, op4, op7]]]
+
+            oline1 = self.getLine(op1, op2)
+            oline2 = self.getLine(op1, op5)
+            oline3 = self.getLine(op5, op6)
+            oline4 = self.getLine(op2, op6)
+            oline5 = self.getLine(op3, op4)
+            oline6 = self.getLine(op3, op7)
+            oline7 = self.getLine(op7, op8)
+            oline8 = self.getLine(op4, op8)
+            oline9 = self.getLine(op5, op7)
+            oline10 = self.getLine(op1, op6)
+            oline11 = self.getLine(op2, op4)
+            oline12 = self.getLine(op6, op8)
+
+            olines = [oline1, oline2, oline3, oline4, oline5, oline6, oline7, oline8, oline9, oline10, oline11, oline12]
+
+            #print(1)
+            for line in olines:
+                for i in range(6):
+                    parallel, intersection, r = self.intersect(planes[0][i], line)
+                    if not parallel:
+                        # test if intersection lies between the edge points
+                        if 0 <= r <= 1:
+                            # test if intersection lies in rectangle of plane
+                            if self.inRectangle(intersection, planes[1][i]):
+                                return True, obj
+            #print(2)
+            for line in lines:
+                for i in range(6):
+                    parallel, intersection, r = self.intersect(oplanes[0][i], line)
+                    if not parallel:
+                        # test if intersection lies between the edge points
+                        # if self.inLineSegment(intersection, line):
+                        if 0 <= r <= 1:
+                            #print("points 1 " + str(points))
+                            #print("points 2 " + str(opoints))
+                            #print("point " + str(intersection))
+                            #print("line " + str(line))
+                            #print("plane " + str(oplanes[0][i]))
+                            #print("in segment")
+                            # test if intersection lies in rectangle of plane
+                            if self.inRectangle(intersection, oplanes[1][i]):
+                                #print("Rectangle points " + str(oplanes[1][i]))
+                                #print("in rectangle")
+                                return True, obj
+
+        return False, self
+
+    def getPlane(self, p1, p2): #Normalenform
+        n = self.vectorSubtraction(p2, p1)
+        no = self.vectorDivision(n, self.vectorLength(n))
+
+        return [no, p1]
+
+    def inRectangle(self, s, points):
+        a = self.vectorSubtraction(points[1], points[0])
+        b = self.vectorSubtraction(points[2], points[0])
+        p = points[0]
+
+        if a[0] != 0:
+            e = s[0] / a[0]
+            c = p[0] / a[0]
+            d = b[0] / a[0]
+            if b[1] - d * a[1] != 0:
+                v = (s[1] - p[1] - e * a[1] + c * a[1]) / (b[1] - d * a[1])
+                u = e - c - v * d
+            else:
+                v = (s[2] - p[2] - e * a[2] + c * a[2]) / (b[2] - d * a[2])
+                u = e - c - v * d
+        elif a[1] != 0:
+            e = s[1] / a[1]
+            c = p[1] / a[1]
+            d = b[1] / a[1]
+            if b[2] - d * a[2] != 0:
+                v = (s[2] - p[2] - e * a[2] + c * a[2]) / (b[2] - d * a[2])
+                u = e - c - v * d
+            else:
+                v = (s[0] - p[0] - e * a[0] + c * a[0]) / (b[0] - d * a[0])
+                u = e - c - v * d
+        else:
+            e = s[2] / a[2]
+            c = p[2] / a[2]
+            d = b[2] / a[2]
+            if b[1] - d * a[1] != 0:
+                v = (s[1] - p[1] - e * a[1] + c * a[1]) / (b[1] - d * a[1])
+                u = e - c - v * d
+            else:
+                v = (s[0] - p[0] - e * a[0] + c * a[0]) / (b[0] - d * a[0])
+                u = e - c - v * d
+
+        return 0 <= u <= 1 and 0 <= v <= 1
+
+    def scalarProduct(self, p, n):
+        return p[0]*n[0] + p[1]*n[1] + p[2]*n[2]
+
+    def vectorLength(self, p):
+        return math.sqrt(math.pow(p[0], 2) + math.pow(p[1], 2) + math.pow(p[2], 2))
+
+    def vectorDivision(self, p, n):
+        return [p[0]/n, p[1]/n, p[2]/n]
+
+    def vectorNegation(self, p):
+        return [-p[0], -p[1], -p[2]]
+
+    def vectorSubtraction(self, p1, p2):
+        return [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]]
+
+    def vectorAddition(self, p1, p2):
+        return [p1[0] + p2[0], p1[1] + p2[1], p1[2] + p2[2]]
+
+    def vectorMultiplication(self, p, scalar):
+        return [p[0] * scalar, p[1] * scalar, p[2] * scalar]
+
+    def getDistanceFromPlane(self, plane, p):
+        return self.scalarProduct(plane[0], self.vectorSubtraction(p, plane[1]))
+
+    def getLine(self, p1, p2):
+        return [p1, self.vectorSubtraction(p2, p1)]
+
+    def intersect(self, plane, line):
+        if self.scalarProduct(plane[0], line[1]) == 0:
+            return True, [], 0
+
+        r = (self.scalarProduct(plane[0], plane[1]) - self.scalarProduct(plane[0], line[0])) / self.scalarProduct(plane[0], line[1])
+        p = self.vectorAddition(line[0], self.vectorMultiplication(line[1], r))
+        return False, p, r
+
+    def inLineSegment(self, p, line):
+        if line[1][0] != 0:
+            r = (p[0] - line[0][0]) / line[1][0]
+        elif line[1][1] != 0:
+            r = (p[1] - line[0][1]) / line[1][1]
+        else:
+            r = (p[2] - line[0][2]) / line[1][2]
+        return 0 <= r <= 1
+
     def isObjectflatonGround(self, x, y, z):
         if 0.99 < x[2] < 1.01 or -0.99 > x[2] > -1.01:
             return True, 0

@@ -4,11 +4,11 @@ import random
 import torch
 import math
 
-r = list(range(4900, 5000))
+r = list(range(0, 4552))
 #random.shuffle(r)
 
 n_agents = 3
-n_actions = 3
+n_actions = 5
 n_positions = 8
 n_orientations = 11
 
@@ -22,7 +22,7 @@ for i in r:
     position = []
     state = []
     problematic = False
-    with open('arrangements_relative/arrangement' + str(i) + '.json') as json_file:
+    with open('arrangements_relative_additional/arrangement' + str(i) + '.json') as json_file:
         data = json.load(json_file)
 
         for j in range(n_actions):
@@ -106,13 +106,13 @@ for i in r:
 
 print(counter)
 
-with open("test_states_relative.json", 'w') as f:
+with open("states_relative_additional.json", 'w') as f:
             json.dump(states, f, indent=2)
 
-with open("test_positions_relative.json", 'w') as f:
+with open("positions_relative_additional.json", 'w') as f:
             json.dump(positions, f, indent=2)
 
-with open("test_agents_relative.json", 'w') as f:
+with open("agents_relative_additional.json", 'w') as f:
             json.dump(agents, f, indent=2)
 
 

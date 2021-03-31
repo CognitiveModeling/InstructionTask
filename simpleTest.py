@@ -31,10 +31,10 @@ print ('Program started')
 sim.simxFinish(-1) # just in case, close all opened connections
 clientID=sim.simxStart('127.0.0.1',19999,True,True,5000,5) # Connect to CoppeliaSim
 
-n_blocks = 1
+n_blocks = 2
 n_actions = n_blocks
-max_cu = 0
-max_cy = 1
+max_cu = 2
+max_cy = 0
 max_s = 0
 
 if clientID!=-1:
@@ -151,49 +151,10 @@ if clientID!=-1:
 
         shape.setColor(r, g, b1)
 
-    time.sleep(1)
+        time.sleep(1)
 
-    sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
-    shapeslist[0].moveTo(0, 0, [])
+        sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
-    orientation_type = [0, 0, 0, 0, 0, 0, 0, 0]
-    facing_choices = [0, 0, 0]
-
-    type = [0, 1, 2, 3, 4, 5, 6, 7]
-    type_choice = np.random.choice(type)
-    type_choice = 7
-
-    orientation_type[type_choice] = 1
-
-    if type_choice == 0 or type_choice == 1 or type_choice == 2:
-        facing_choices[0] = np.random.uniform(- math.pi / 2, math.pi / 2)
-    elif type_choice == 3 or type_choice == 4 or type_choice == 5:
-        facing_choices[0] = np.random.uniform(- math.pi / 2, math.pi / 2)
-        facing = [1, 2]
-        facing_choice = np.random.choice(facing)
-        facing_choices[facing_choice] = 1
-    else:
-        num = [1, 2]
-        num_choice = np.random.choice(num)
-        facing = [0, 1, 2]
-
-        facing_choice = np.random.choice(facing, num_choice)
-
-        if num_choice == 2:
-            facing_choices[facing_choice[0]] = 1
-            facing_choices[facing_choice[1]] = 1
-        else:
-            facing_choices[facing_choice[0]] = 1
-
-    shapeslist[0].setVisualOrientation(
-        [orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-         facing_choices[0], facing_choices[1], facing_choices[2]])
-    print([orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-         facing_choices[0], facing_choices[1], facing_choices[2]])
-    shapeslist[0].setPosition_eval([shapeslist[0].getPosition()[0], shapeslist[0].getPosition()[1],
-                                    shapeslist[0].getBoundingBoxWorld()[2] * 0.5], [])
     #shapeslist[0].setOrientation([o1, o2, o3, o4, o5, o6])
     #rotation = shapeslist[0].rotationfromWorldAxis(alpha, beta, gamma)
     #shapeslist[0].setradianOrientation(rotation)
@@ -203,8 +164,58 @@ if clientID!=-1:
     #shapeslist[1].setColor(0, 0, 1)
     #shapeslist[2].moveRightOf(shapeslist[0], withoutAll[2])
 
-    input()
+    for i in range(2):
+        if i == 0:
+            shapeslist[i].setVisualOrientation([0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0])
+        if i == 1:
+            shapeslist[i].setVisualOrientation([0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
 
+        shapeslist[i].moveTo(i * 0.01, i * 0.01, withoutAll[i])
+
+        input()
+
+    for i in range(100):
+        orientation_type = [0, 0, 0, 0, 0, 0, 0, 0]
+        facing_choices = [0, 0, 0]
+
+        type = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 4, 5, 6, 7]
+        type_choice = np.random.choice(type)
+
+        orientation_type[type_choice] = 1
+
+        if type_choice == 0 or type_choice == 1 or type_choice == 2:
+            facing_choices[0] = np.random.uniform(- 1, 1)
+            facing_choices[1] = mathown.get_cos(facing_choices[0])
+        elif type_choice == 3 or type_choice == 4 or type_choice == 5:
+            facing_choices[0] = np.random.uniform(- 1, 1)
+            facing_choices[1] = mathown.get_cos(facing_choices[0])
+            facing = [1, 2]
+            facing_choice = np.random.choice(facing)
+            facing_choices[facing_choice] = 1
+        else:
+            num = [1, 2]
+            num_choice = np.random.choice(num)
+            facing = [0, 1, 2]
+
+            facing_choice = np.random.choice(facing, num_choice)
+
+            if num_choice == 2:
+                facing_choices[facing_choice[0]] = 1
+                facing_choices[facing_choice[1]] = 1
+            else:
+                facing_choices[facing_choice[0]] = 1
+
+        shapeslist[1].setVisualOrientation(
+            [orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
+             orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
+             facing_choices[0], facing_choices[1], facing_choices[2]])
+
+        a = np.random.uniform(-0.5, 0.5)
+        b = np.random.uniform(-0.5, 0.5)
+        time.sleep(1)
+
+        shapeslist[1].moveTo(a, b, withoutAll[1])
+        input()
 
     for i in range(len(shapeslist)):
         #shapeslist[i].setPosition([i-4, 3, shapeslist[i].getPosition()[2]])
