@@ -12,8 +12,9 @@ class Shape:
     def __init__(self, clientID, shape, number):  # probabilitySpace is a dictionary
         self.type = shape.__class__.__name__
         self.shapetype = shape
-        if shape != "Cuboid" and shape != "Cylinder" and shape != "Sphere":
-            print("false name")
+        if shape != "Cuboid" and shape != "Cylinder" and shape != "Sphere" and shape != "Cone" and shape != "Pyramid":
+            print("false name: " + shape)
+            exit()
         elif number == 0:
             self.name = shape + "#"
         else:
@@ -21,10 +22,14 @@ class Shape:
             self.name = name.format(number - 1)
         if shape == "Cuboid":
             self.shapetype_numbered = 0
-        elif shape == "Sphere":
+        elif shape == "Cylinder":
             self.shapetype_numbered = 1
-        else:
+        elif shape == "Sphere":
             self.shapetype_numbered = 2
+        elif shape == "Cone":
+            self.shapetype_numbered = 3
+        elif shape == "Pyramid":
+            self.shapetype_numbered = 4
         self.clientID = clientID
         self.handle = self.getHandle()
         self.position = [0, 0, 0]
@@ -256,12 +261,7 @@ class Shape:
         return self.boundingBox
 
     def getType(self):
-        if self.shapetype == "Cuboid":
-            return 0
-        elif self.shapetype == "Cylinder":
-            return 1
-        else:
-            return 2
+        return self.shapetype_numbered
 
     def getVectors(self):
         o = self.getradianOrientation()
@@ -766,7 +766,7 @@ class Shape:
         return list(position)
 
     def moveTo(self, x, y, shapelist):
-        position = [x, y, 1]
+        position = [x, y, self.getBoundingBoxWorld()[2] * 0.5]
         position = self.setPosition(position, shapelist)
 
         return list(position)
@@ -998,6 +998,12 @@ class Shape:
                                 return True, obj
 
         return False, self
+
+    def get_other_shape_id(self, idx):
+        if idx == 0:
+            return 1
+        else:
+            return 0
 
     def getPlane(self, p1, p2): #Normalenform
         n = self.vectorSubtraction(p2, p1)

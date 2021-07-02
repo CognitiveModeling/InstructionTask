@@ -10,12 +10,13 @@ import sim
 import math
 import actioninference as AI
 import mathown
+import attention_net
 
-with open('test_states_relative.json') as json_file:
+with open('test_states_relative_additional.json') as json_file:
         states = json.load(json_file)
-with open('test_positions_relative.json') as json_file:
+with open('test_positions_relative_additional.json') as json_file:
         positions = json.load(json_file)
-with open('test_agents_relative.json') as json_file:
+with open('test_agents_relative_additional.json') as json_file:
         agents = json.load(json_file)
 
 n_samples = len(states)
@@ -29,8 +30,9 @@ criterion = nn.MSELoss()
 timesteps = seq_len
 batch_sz = 1
 n_states = seq_len + 1
+n_single_state = n_positions + 7
 
-random_tests = 50000
+random_tests = 5000
 
 states = torch.FloatTensor(states).to(device="cuda")
 positions = torch.FloatTensor(positions).to(device="cuda")
@@ -53,9 +55,9 @@ for i in range(seq_len):
 if not os.path.exists('eval_results'):
         os.makedirs('eval_results')
 
-PATH = "state_dict_model_relative_additional_4550samples_new_reduced.pt"
+PATH = "state_dict_model_relative_additional_6000samples_new_reduced_reference.pt"
 
-net = net_test.Net(batch_sz, n_blocks, timesteps).to(device="cuda")
+net = attention_net.Net(batch_sz, n_blocks, timesteps).to(device="cuda")
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
 net.eval()
 
@@ -115,11 +117,13 @@ if clientID!=-1:
         positions_target = positions[:, i_batch, :, :]
 
         state = states[0, i_batch, :, :]
-        state = state.view(1, batch_sz, block_sz).to(device="cuda")
+        #state = state.view(1, batch_sz, block_sz).to(device="cuda")
+        state = state.view(1, 1, block_sz)
 
         #target = states[timesteps, i_batch, :, :]
         #target = target.view(1, batch_sz, block_sz)
         target = states[:, i_batch, :, :]
+        target = target.view(n_states, n_blocks, n_single_state)
 
         for b in range(batch_sz):
             for i in range(n_blocks):
@@ -189,6 +193,8 @@ if clientID!=-1:
                     bb = shapeslist[bl].getBoundingBox()
                     t = shapeslist[bl].getType()
 
+                    state = state.view(1, 1, block_sz)
+
                     state[0][0][bl * state_sz] = t
                     state[0][0][bl * state_sz + 1] = c[0]
                     state[0][0][bl * state_sz + 2] = c[1]
@@ -219,8 +225,9 @@ if clientID!=-1:
                     state = state.to(device="cuda")
 
                 #hidden = current_hidden
-            for b in range(batch_sz):
 
+            for b in range(batch_sz):
+                state = state.view(1, n_blocks, n_single_state)
                 #print(state)
                 #print(target)
 
@@ -229,7 +236,7 @@ if clientID!=-1:
                     # actionsequence = torch.zeros([seq_len, batch_sz, n_positions]).to(device="cuda")
                     blocks_choice = torch.zeros([seq_len, batch_sz, n_blocks]).to(device="cuda")
 
-                    if trial % 10000 == 0:
+                    if trial % 1000 == 0:
                         print("test trial " + str(trial))
                         print("current loss: " + str(current_loss))
                     po = torch.zeros([batch_sz, n_positions]).to(device="cuda")
@@ -304,8 +311,8 @@ if clientID!=-1:
                     #actionsequence[idx] = po
                     #blocks_choice[idx] = current_block
                     #po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
-                    #if idx == 0:
-                    current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
+                    if idx == 0:
+                        current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
 
                     new_state = net(state, current_block, po)
 
@@ -314,7 +321,7 @@ if clientID!=-1:
                     #del po
                     #del current_block
 
-                    loss = net.loss(new_state, target[seq_len].view(1, batch_sz, block_sz))
+                    loss = net.loss(new_state, target[seq_len].view(1, n_blocks, n_single_state))
 
                     #print("state: " + str(state))
                     #print("position: " + str(po))
@@ -371,6 +378,8 @@ if clientID!=-1:
                 bb = shapeslist[bl].getBoundingBox()
                 t = shapeslist[bl].getType()
 
+                state = state.view(1, 1, block_sz)
+
                 state[0][0][bl * state_sz] = t
                 state[0][0][bl * state_sz + 1] = c[0]
                 state[0][0][bl * state_sz + 2] = c[1]
@@ -398,8 +407,10 @@ if clientID!=-1:
                 state[0][0][bl * state_sz + 24] = o[9]
                 state[0][0][bl * state_sz + 25] = o[10]
 
+                state = state.view(1, n_blocks, n_single_state)
+
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-            loss = net.loss(state[0], target[timesteps])
+            loss = net.loss(state.view(1, batch_sz, block_sz), target[seq_len].view(1, batch_sz, block_sz))
         print(loss)
         print(loss.mean())
         #print("state: " + str(state[0]))

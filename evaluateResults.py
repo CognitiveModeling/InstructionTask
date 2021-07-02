@@ -33,7 +33,7 @@ if clientID != -1:
     n_states = n_blocks + 1
     seq_len = n_blocks
 
-    for idx in range(15, 30):
+    for idx in range(0, 100):
         with open('test_states_relative.json') as json_file:
             target_states = json.load(json_file)
         with open('test_agents_relative.json') as json_file:
@@ -54,6 +54,7 @@ if clientID != -1:
                         helper.append(ai_states[0][j][m + 1][n])
 
         for target in [True, False]:
+        #for target in [False]:
             print(idx)
             print(target)
 

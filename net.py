@@ -18,7 +18,7 @@ class Net(nn.Module):
         self.mid_dim = 70
         self.n_lstm_layers = 2
         self.n_hidden = 128
-        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation)
+        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation) + 3
         self.batch_sz = batch_sz
 
         # network

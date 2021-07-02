@@ -58,7 +58,7 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(4000, 5000))
+    even_list = list(range(5476, 6005))
 
     for j in even_list:
         print(j)
