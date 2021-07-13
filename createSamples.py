@@ -4,6 +4,23 @@ import random
 import torch
 import math
 
+
+def same_orientation(po1, po2):
+    if po1[0] == po2[0] and po1[1] == po2[1] and po1[2] == po2[2] and po1[3] == po2[3] and po1[4] == po2[4] and po1[5] == po2[5] and po1[6] == po2[6] and po1[7] == po2[7]:
+        return po1[8] - 0.01 <= po2[8] <= po1[8] + 0.01 and po1[9] - 0.01 <= po2[9] <= po1[9] + 0.01 and po1[10] - 0.01 \
+               <= po2[10] <= po1[10] + 0.01
+    else:
+        return False
+
+
+def same_position(po1, po2):
+    if po1[0] == po2[0] and po1[1] == po2[1] and po1[2] == po2[2] and po1[3] == po2[3] and po1[4] == po2[4]:
+        return po1[5] - 0.01 <= po2[5] <= po1[5] + 0.01 and po1[6] - 0.01 <= po2[6] <= po1[6] + 0.01 and po1[7] - 0.01 \
+               <= po2[7] <= po1[7] + 0.01
+    else:
+        return False
+
+
 r = list(range(4900, 5000))
 #random.shuffle(r)
 
@@ -15,12 +32,14 @@ n_orientations = 11
 agents = []
 positions = []
 states = []
+states_target = []
 counter = 0
 
 for i in r:
     actor = []
     position = []
     state = []
+    state_target = []
     problematic = False
     with open('arrangements_relative/arrangement' + str(i) + '.json') as json_file:
         data = json.load(json_file)
@@ -66,15 +85,29 @@ for i in r:
 
             if problematic:
                 break
+
+            block = data[j][n_agents][0]
             state.append(helper)
-            actor.append(data[j][n_agents][0])
+            if j > 0:
+                target_helper = helper.copy()
+            actor.append(block)
             for idx in range(n_positions):
                 pos_helper.append(data[j][n_agents][1][idx])
             for idx in range(n_orientations):
                 pos_helper.append(data[j][n_agents][2][idx])
             position.append(pos_helper)
 
+            if j > 0:
+                if same_orientation(data[j-1][n_agents][2], data[j][data[j-1][n_agents][0][0]][4]) and \
+                        same_position(data[j-1][n_agents][1], data[j][data[j-1][n_agents][0][0]][3]):
+                    target_helper.append(1)
+                else:
+                    target_helper.append(0)
+
+                state_target.append(target_helper)
+
         helper = []
+        target_helper = []
         #for item in reference:
         #    helper.append(item)
         for l in range(n_agents):
@@ -104,6 +137,15 @@ for i in r:
                         helper.append(data[n_actions][l][m+1][n])
 
         state.append(helper)
+        target_helper = helper.copy()
+
+        if same_orientation(data[n_actions - 1][n_agents][2], data[n_actions][data[n_actions - 1][n_agents][0][0]][4]) and \
+                same_position(data[n_actions - 1][n_agents][1], data[n_actions][data[n_actions - 1][n_agents][0][0]][3]):
+            target_helper.append(1)
+        else:
+            target_helper.append(0)
+
+        state_target.append(target_helper)
 
         if problematic:
             counter += 1
@@ -112,11 +154,15 @@ for i in r:
     agents.append(actor)
     positions.append(position)
     states.append(state)
+    states_target.append(state_target)
 
 print(counter)
 
-with open("test_states_relative_additional.json", 'w') as f:
+with open("teststates_relative_additional.json", 'w') as f:
             json.dump(states, f, indent=2)
+
+with open("test_states_target_relative_additional.json", 'w') as f:
+            json.dump(states_target, f, indent=2)
 
 with open("test_positions_relative_additional.json", 'w') as f:
             json.dump(positions, f, indent=2)

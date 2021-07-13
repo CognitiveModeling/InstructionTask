@@ -18,7 +18,7 @@ class Net(nn.Module):
         self.mid_dim = 70
         self.n_lstm_layers = 2
         self.n_hidden = 128
-        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation) + 3
+        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation)
         self.batch_sz = batch_sz
 
         # network
@@ -38,6 +38,7 @@ class Net(nn.Module):
         return hidden
 
     def forward(self, state, block, position):
+        state = state.view(self.batch_sz, 1,  self.n_state)
         out1 = torch.tanh(self.l1(state))
         out2 = torch.tanh(self.l2(position))
         out3 = torch.tanh(self.l3(block))
@@ -54,7 +55,7 @@ class Net(nn.Module):
 
     def loss(self, output, target):
 
-        #target = target.squeeze(0)
+        target = target.view(self.batch_sz, 1, self.n_state)
 
         loss = F.mse_loss(output, target, reduction="none")
 

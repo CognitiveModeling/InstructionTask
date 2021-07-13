@@ -17,12 +17,11 @@ class Net(nn.Module):
         self.n_boundingbox = 3
         self.n_type = 1
         self.vector_dim = 128
-        self.n_lstm_layers = 2
-        self.n_hidden = 128
         self.single_state = self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation
         self.n_state = self.n_blocks * self.single_state
         self.batch_sz = batch_sz
         self.values = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
+        self.for_cat = torch.zeros(self.batch_sz, 1, 1).to(device="cuda")
 
         # network
         self.q = nn.Linear(self.single_state + self.n_action, self.vector_dim)
@@ -31,6 +30,8 @@ class Net(nn.Module):
 
         self.l1 = nn.Linear(self.vector_dim, self.vector_dim)
         self.l2 = nn.Linear(self.vector_dim, self.single_state)
+
+        self.confidence_layer = nn.Linear(self.n_blocks * (self.n_action + self.single_state), 1)
 
         torch.autograd.set_detect_anomaly(True)
 
@@ -47,13 +48,16 @@ class Net(nn.Module):
         return values
 
     def create_block_action(self, states, block_id, action):
-        action_dummy = torch.zeros(self.batch_sz, self.n_blocks, self.n_action).to(device="cuda")
-        block_id = torch.repeat_interleave(block_id, self.n_action, dim=1).view(self.batch_sz, self.n_blocks, self.n_action)
+        action_dummy = torch.ones(self.batch_sz, self.n_blocks, self.n_action).to(device="cuda") * -1
+        block_id = torch.repeat_interleave(block_id, self.n_action, dim=-1).view(self.batch_sz, self.n_blocks, self.n_action)
         action = torch.repeat_interleave(action, 3, dim=0).view(self.batch_sz, self.n_blocks, self.n_action)
         action_dummy = torch.where(block_id == 1, action, action_dummy)
         block_action = torch.cat((states, action_dummy), dim=2)
 
         return block_action
+
+    def create_base_target_state(self, state):
+        return torch.cat((state, self.for_cat), dim=-1)
 
     def forward(self, states, block_id, action):
         block_action = self.create_block_action(states, block_id, action).to(device="cuda")
@@ -61,10 +65,11 @@ class Net(nn.Module):
         q = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
         k = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
         v = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
+
         for i in range(self.n_blocks):
-            q[:, i, :] = torch.tanh(self.q(block_action[:, i, :]))
-            k[:, i, :] = torch.tanh(self.k(block_action[:, i, :]))
-            v[:, i, :] = torch.tanh(self.v(block_action[:, i, :]))
+            q[:, i, :] = self.q(block_action[:, i, :])#torch.tanh(self.q(block_action[:, i, :]))
+            k[:, i, :] = self.k(block_action[:, i, :])#torch.tanh(self.k(block_action[:, i, :]))
+            v[:, i, :] = self.v(block_action[:, i, :])#torch.tanh(self.v(block_action[:, i, :]))
 
         cos = nn.CosineSimilarity(dim=1)
         softmax = nn.Softmax(dim=2)
@@ -77,8 +82,20 @@ class Net(nn.Module):
         a = softmax(d)
 
         residuals = self.predict_values(a, v)
+        #residuals = self.l1(residuals)
         residuals = torch.tanh(self.l1(residuals))
-        residuals = torch.tanh(self.l2(residuals))
+        residuals = self.l2(residuals)
+
+        block_action = block_action.view(self.batch_sz, 1, self.n_blocks * (self.n_action + self.single_state))
+
+        residuals = residuals.view(self.batch_sz, 1, self.n_state)
+        confidence = torch.sigmoid(self.confidence_layer(block_action))
+        residuals = torch.cat((residuals, confidence), dim=-1)
+
+        #print("residuals: " + str(residuals))
+
+        states = states.view(self.batch_sz, 1, self.n_state)
+        states = self.create_base_target_state(states)
 
         out = states + residuals
 
