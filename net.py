@@ -10,15 +10,14 @@ class Net(nn.Module):
 
         self.n_blocks = n_agents
         self.n_position = 8
-        self.n_orientation = 11
+        self.n_orientation = 5
+        self.n_distances = 2
         self.n_color = 3
         self.n_blocknr = 1
-        self.n_boundingbox = 3
+        self.n_boundingbox = 1
         self.n_type = 1
-        self.mid_dim = 70
-        self.n_lstm_layers = 2
-        self.n_hidden = 128
-        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation)
+        self.n_state = self.n_blocks * (self.n_type + self.n_color + self.n_boundingbox + self.n_position
+                                        + self.n_orientation + self.n_distances)
         self.batch_sz = batch_sz
 
         # network
@@ -41,8 +40,60 @@ class Net(nn.Module):
         for_cat = torch.zeros(self.batch_sz, 1).to(device="cuda")
         return torch.cat((state, for_cat), dim=-1)
 
-    def forward(self, state, block, position):
+    def recreate_onehot(self, block):
+        blocks = block.clone()
+        one = torch.argmax(blocks[0])
+        u = blocks[0]
+
+        for guess in range(0, len(blocks[0])):
+            u[guess] = 0.0
+
+        u[one] = 1.0
+
+        blocks[0] = u
+
+        return blocks
+
+    def recreate_action(self, a, first_block):
+        action = a.clone()
+        position = torch.narrow(action, -1, 0, 5)
+        orientation = torch.narrow(action, -1, 8, 3)
+
+        pos_one = torch.argmax(position[0])
+        pos_u = position[0]
+
+        ort_one = torch.argmax(orientation[0])
+        ort_u = orientation[0]
+
+        for guess in range(0, len(position[0])):
+            pos_u[guess] = 0.0
+
+        for guess in range(0, len(orientation[0])):
+            ort_u[guess] = 0.0
+
+        pos_u[pos_one] = 1.0
+        ort_u[ort_one] = 1.0
+
+        action[0][0] = pos_u[0]
+        action[0][1] = pos_u[1]
+        action[0][2] = pos_u[2]
+        action[0][3] = pos_u[3]
+        action[0][4] = pos_u[4]
+        action[0][8] = ort_u[0]
+        action[0][9] = ort_u[1]
+        action[0][10] = ort_u[2]
+        if first_block:
+            for j in range(8):
+                action[0][j] = 0.0
+
+        return action
+
+    def forward(self, state, blocks, positions, first_block=False, ai=False):
         state = state.view(self.batch_sz, self.n_state)
+
+        position = positions
+        block = blocks
+
         out1 = torch.tanh(self.l1(state))
         out2 = torch.tanh(self.l2(position))
         out3 = torch.tanh(self.l3(block))

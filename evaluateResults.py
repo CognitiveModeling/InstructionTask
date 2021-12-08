@@ -31,14 +31,14 @@ if clientID != -1:
     timesteps = 20
     batch_sz = 1
     n_states = n_blocks + 1
-    seq_len = n_blocks
+    seq_len = n_blocks + 2
 
-    for idx in range(0, 100):
-        with open('test_states_relative.json') as json_file:
+    for idx in range(0, 10):
+        with open('test_states_relative_additional.json') as json_file:
             target_states = json.load(json_file)
-        with open('test_agents_relative.json') as json_file:
+        with open('test_agents_relative_additional.json') as json_file:
             target_blocks = json.load(json_file)
-        with open('ai3_result' + str(idx) + '.json') as json_file:
+        with open('ai3_result_attention' + str(idx) + '.json') as json_file:
             ai_states = json.load(json_file)
 
         helper = []
@@ -53,8 +53,8 @@ if clientID != -1:
                     for n in range(3):
                         helper.append(ai_states[0][j][m + 1][n])
 
-        for target in [True, False]:
-        #for target in [False]:
+        #for target in [True, False]:
+        for target in [True]:
             print(idx)
             print(target)
 
@@ -71,11 +71,27 @@ if clientID != -1:
             first_block = target_blocks[idx][0][0]
 
             if target:
-                state_sz = 26
+                states = target_states[idx, seq_len, :]
+
+                n_samples = len(states)
                 n_blocks = 3
-                block_sz = state_sz * n_blocks
-                n_position = 19
-                states = target_states[idx, n_blocks, :]
+                n_positions = 8
+                seq_len = n_blocks + 2
+                criterion = nn.MSELoss()
+                timesteps = seq_len
+                batch_sz = 1
+                n_states = seq_len + 1
+
+                n_size = 1
+                n_color = 3
+                n_type = 1
+                n_orientations = 5
+                n_position = n_positions + n_orientations
+                n_distances = 2
+                action_size = n_positions + n_orientations
+                n_single_state = n_position + n_distances + n_size + n_type + n_color
+                block_sz = n_single_state * n_blocks
+                state_sz = n_single_state
             else:
                 states = ai_states[0, 0, :]
 
@@ -85,6 +101,7 @@ if clientID != -1:
             s = 0
 
             for i in range(n_blocks):
+                #print(states[i * state_sz])
                 if states[i * state_sz] == 0:
                     shapeslist.append(shapes.Shape(clientID, "Cuboid", cu))
                     cu += 1
@@ -94,22 +111,6 @@ if clientID != -1:
                 if states[i * state_sz] == 2:
                     shapeslist.append(shapes.Shape(clientID, "Sphere", s))
                     s += 1
-
-            cuboid1 = shapes.Shape(clientID, "Cuboid", 0)
-            cuboid2 = shapes.Shape(clientID, "Cuboid", 1)
-            cuboid3 = shapes.Shape(clientID, "Cuboid", 2)
-            cuboid4 = shapes.Shape(clientID, "Cuboid", 3)
-            cuboid5 = shapes.Shape(clientID, "Cuboid", 4)
-            sphere1 = shapes.Shape(clientID, "Sphere", 0)
-            sphere2 = shapes.Shape(clientID, "Sphere", 1)
-            cylinder1 = shapes.Shape(clientID, "Cylinder", 0)
-            cylinder2 = shapes.Shape(clientID, "Cylinder", 1)
-            cylinder3 = shapes.Shape(clientID, "Cylinder", 2)
-            cylinder4 = shapes.Shape(clientID, "Cylinder", 3)
-            cylinder5 = shapes.Shape(clientID, "Cylinder", 4)
-
-            allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
-                         sphere2, sphere1]
 
             withoutAll = []
 
@@ -134,37 +135,38 @@ if clientID != -1:
                 b = states[state_sz * i_shape + 3]
 
                 bb1 = states[state_sz * i_shape + 4] * 2
-                bb2 = states[state_sz * i_shape + 5] * 2
-                bb3 = states[state_sz * i_shape + 6] * 2
+                if not target:
+                    bb2 = states[state_sz * i_shape + 5] * 2
+                    bb3 = states[state_sz * i_shape + 6] * 2
 
-                p1 = states[state_sz * i_shape + 7]
-                p2 = states[state_sz * i_shape + 8]
-                p3 = states[state_sz * i_shape + 9]
-                if target:
-                    p4 = states[state_sz * i_shape + 10]
-                    p5 = states[state_sz * i_shape + 11]
-                    p6 = states[state_sz * i_shape + 12]
-                    p7 = states[state_sz * i_shape + 13]
-                    p8 = states[state_sz * i_shape + 14]
+                    p1 = states[state_sz * i_shape + 7]
+                    p2 = states[state_sz * i_shape + 8]
+                    p3 = states[state_sz * i_shape + 9]
 
-                    o1 = states[state_sz * i_shape + 15]
-                    o2 = states[state_sz * i_shape + 16]
-                    o3 = states[state_sz * i_shape + 17]
-                    o4 = states[state_sz * i_shape + 18]
-                    o5 = states[state_sz * i_shape + 19]
-                    o6 = states[state_sz * i_shape + 20]
-                    o7 = states[state_sz * i_shape + 21]
-                    o8 = states[state_sz * i_shape + 22]
-                    o9 = states[state_sz * i_shape + 23]
-                    o10 = states[state_sz * i_shape + 24]
-                    o11 = states[state_sz * i_shape + 25]
-                else:
                     o1 = states[state_sz * i_shape + 10]
                     o2 = states[state_sz * i_shape + 11]
                     o3 = states[state_sz * i_shape + 12]
                     o4 = states[state_sz * i_shape + 13]
                     o5 = states[state_sz * i_shape + 14]
                     o6 = states[state_sz * i_shape + 15]
+                if target:
+                    bb2 = bb1
+                    bb3 = bb1
+
+                    p1 = states[state_sz * i_shape + 5]
+                    p2 = states[state_sz * i_shape + 6]
+                    p3 = states[state_sz * i_shape + 7]
+                    p4 = states[state_sz * i_shape + 8]
+                    p5 = states[state_sz * i_shape + 9]
+                    p6 = states[state_sz * i_shape + 10]
+                    p7 = states[state_sz * i_shape + 11]
+                    p8 = states[state_sz * i_shape + 12]
+
+                    o1 = states[state_sz * i_shape + 13]
+                    o2 = states[state_sz * i_shape + 14]
+                    o3 = states[state_sz * i_shape + 15]
+                    o4 = states[state_sz * i_shape + 16]
+                    o5 = states[state_sz * i_shape + 17]
 
                 shapeslist[i_shape].setColor(r, g, b)
                 shapeslist[i_shape].scaleShape(bb1, bb2, bb3)
@@ -172,15 +174,15 @@ if clientID != -1:
                     shapeslist[i_shape].setOrientation([o1, o2, o3, o4, o5, o6])
                     shapeslist[i_shape].setPosition_eval([p1, p2, p3], [])
                 else:
-                    shapeslist[i_shape].setVisualOrientation([o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11])
+                    shapeslist[i_shape].setVisualOrientation_simple([o1, o2, o3, o4, o5])
                     time.sleep(1)
                     shapeslist[i_shape].setPosition_eval_from_relativePosition([p1, p2, p3, p4, p5], shapeslist[first_block], p6, p7, p8, [])
             input()
             for i_shape in range(n_blocks):
 
                 bb1 = 1/(states[state_sz * i_shape + 4] * 2)
-                bb2 = 1/(states[state_sz * i_shape + 5] * 2)
-                bb3 = 1/(states[state_sz * i_shape + 6] * 2)
+                bb2 = 1/(states[state_sz * i_shape + 4] * 2)
+                bb3 = 1/(states[state_sz * i_shape + 4] * 2)
 
                 p1 = i_shape
                 p2 = 3

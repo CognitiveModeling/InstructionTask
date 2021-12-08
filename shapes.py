@@ -1,3 +1,5 @@
+import torch
+
 import sim
 from scipy.spatial.transform import Rotation as R
 import mathown
@@ -121,6 +123,77 @@ class Shape:
     def getOrientationFromCoordinateSystem(self, xvec, yvec, zvec):
         r = R.from_matrix([xvec, yvec, zvec])
         return r.as_rotvec()
+
+    def getOrientationType_simple(self):
+        #sbb = self.getBoundingBox()
+        o = self.getradianOrientation()
+
+        if self.outOfBounds(self.getPosition()):
+            return [-1, -1, -1, -1, -1, -1]
+
+        type = [0, 0, 0, 0, 0, 0]
+
+        ex = math.degrees(o[0])
+        ey = math.degrees(o[1])
+        ez = math.degrees(o[2])
+
+        r= R.from_euler('XYZ', [ex, ey, ez], degrees=True)
+        #r= R.from_rotvec(o)
+
+        x = self.getXvector(r)
+        y = self.getYvector(r)
+        z = self.getZvector(r)
+
+        axes = [x, y, z]
+
+        flat, axis = self.isObjectflatonGround(x, y, z)
+
+        if flat:
+            type[0] = 1
+
+            axes.pop(axis)
+
+            if abs(axes[0][1]) < abs(axes[1][1]):
+                ref_axis = axes[0]
+            else:
+                ref_axis = axes[1]
+
+            type[3] = ref_axis[1]
+            if ref_axis[0] < 0:
+                type[3] = -type[3]
+
+            type[3], type[4] = encode_orientation(type[3])
+
+        else:
+            edge, axis = self.isObjectonEdge(x, y, z)
+
+            if edge:
+                ref_axis = axes[axis]
+                type[1] = 1
+                axes.pop(axis)
+
+                type[3] = ref_axis[1]
+                if ref_axis[0] < 0:
+                    type[3] = -type[3]
+
+                type[3], type[4] = encode_orientation(type[3])
+
+                for ax in axes:
+                    if ax[2] < 0:
+                        ax = self.vectorNegation(ax)
+
+                if axes[0][1] < axes[1][1]:
+                    front_axis = axes[0]
+                else:
+                    front_axis = axes[1]
+
+                if front_axis[2] < 0.707:
+                    type[5] = 1
+
+            else:
+                type[2] = 1
+
+        return type
 
     def getOrientationType(self):
         sbb = self.getBoundingBox()
@@ -309,6 +382,255 @@ class Shape:
         else:
             return return_code
 
+    def getDistance_from_shape(self, shape):
+        if self.outOfBounds(self.getPosition()) or self.outOfBounds(shape.getPosition()):
+            return -1
+
+        direction_vector1 = self.getLine(shape.getPosition(), self.getPosition())
+        direction_vector2 = self.getLine(self.getPosition(), shape.getPosition())
+
+        op1, op2, op3, op4, op5, op6, op7, op8 = shape.getEdgePoints(shape.getPosition())
+        opoints = [op1, op2, op3, op4, op5, op6, op7, op8]
+
+        p1, p2, p3, p4, p5, p6, p7, p8 = self.getEdgePoints(self.getPosition())
+        points = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+        oplane1 = self.getPlane(op1, op5)
+        oplane2 = self.getPlane(op1, op2)
+        oplane3 = self.getPlane(op1, op3)
+
+        oplane11 = self.getPlane(op8, op4)
+        oplane21 = self.getPlane(op8, op7)
+        oplane31 = self.getPlane(op8, op6)
+
+        oplanes = [[oplane1, oplane2, oplane3, oplane11, oplane21, oplane31], [[op1, op2, op3], [op1, op3, op5],
+                                                                               [op1, op2, op5], [op8, op7, op6],
+                                                                               [op8, op4, op6], [op8, op4, op7]]]
+
+        oline1 = self.getLine(op1, op2)
+        oline2 = self.getLine(op1, op5)
+        oline3 = self.getLine(op5, op6)
+        oline4 = self.getLine(op2, op6)
+        oline5 = self.getLine(op3, op4)
+        oline6 = self.getLine(op3, op7)
+        oline7 = self.getLine(op7, op8)
+        oline8 = self.getLine(op4, op8)
+        oline9 = self.getLine(op5, op7)
+        oline10 = self.getLine(op1, op6)
+        oline11 = self.getLine(op2, op4)
+        oline12 = self.getLine(op6, op8)
+
+        olines = [oline1, oline2, oline3, oline4, oline5, oline6, oline7, oline8, oline9, oline10, oline11, oline12]
+
+        plane1 = self.getPlane(p1, p5)
+        plane2 = self.getPlane(p1, p2)
+        plane3 = self.getPlane(p1, p3)
+
+        plane11 = self.getPlane(p8, p4)
+        plane21 = self.getPlane(p8, p7)
+        plane31 = self.getPlane(p8, p6)
+
+        planes = [[plane1, plane2, plane3, plane11, plane21, plane31], [[p1, p2, p3], [p1, p3, p5], [p1, p2, p5],
+                                                                        [p8, p7, p6], [p8, p4, p6], [p8, p4, p7]]]
+        line1 = self.getLine(p1, p2)
+        line2 = self.getLine(p1, p5)
+        line3 = self.getLine(p5, p6)
+        line4 = self.getLine(p2, p6)
+        line5 = self.getLine(p3, p4)
+        line6 = self.getLine(p3, p7)
+        line7 = self.getLine(p7, p8)
+        line8 = self.getLine(p4, p8)
+        line9 = self.getLine(p5, p7)
+        line10 = self.getLine(p1, p6)
+        line11 = self.getLine(p2, p4)
+        line12 = self.getLine(p6, p8)
+
+        lines = [line1, line2, line3, line4, line5, line6, line7, line8, line9, line10, line11, line12]
+
+        closest_point = self.perpendicular_point_line(op1, direction_vector1)
+        fixed_point = op1
+        d = 10
+
+        for point in opoints:
+            new_point = self.perpendicular_point_line(point, direction_vector1)
+            helper_vector = self.vectorSubtraction(new_point, closest_point)
+
+            if helper_vector[0] != 0:
+                u = direction_vector1[1][0] / helper_vector[0]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+            elif helper_vector[1] != 0:
+                u = direction_vector1[1][1] / helper_vector[1]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+            elif helper_vector[2] != 0:
+                u = direction_vector1[1][2] / helper_vector[2]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+
+        #print(closest_point)
+
+        for p in range(6):
+            plane = planes[0][p]
+            rect = planes[1][p]
+            help, intersect = self.getDistanceFromPlane_intersect(plane, fixed_point)
+            help = abs(help)
+            if help < d and self.inRectangle(intersect, rect):
+                d = help
+        for line in lines:
+            help = self.distance_point_line(fixed_point, line)
+            intersect = self.perpendicular_point_line(fixed_point, line)
+
+            if help < d and self.inLineSegment(intersect, line):
+                d = help
+
+        closest_point = self.perpendicular_point_line(p1, direction_vector2)
+        fixed_point = p1
+
+        for point in points:
+            new_point = self.perpendicular_point_line(point, direction_vector2)
+            helper_vector = self.vectorSubtraction(new_point, closest_point)
+
+            if helper_vector[0] != 0:
+                u = direction_vector2[1][0] / helper_vector[0]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+            elif helper_vector[1] != 0:
+                u = direction_vector2[1][1] / helper_vector[1]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+            elif helper_vector[2] != 0:
+                u = direction_vector2[1][2] / helper_vector[2]
+                if u > 0:
+                    closest_point = new_point
+                    fixed_point = point
+
+        #print(closest_point)
+
+        for p in range(6):
+            plane = oplanes[0][p]
+            rect = oplanes[1][p]
+            help, intersect = self.getDistanceFromPlane_intersect(plane, fixed_point)
+            help = abs(help)
+            if help < d and self.inRectangle(intersect, rect):
+                d = help
+        for line in olines:
+            help = self.distance_point_line(fixed_point, line)
+            intersect = self.perpendicular_point_line(fixed_point, line)
+
+            if help < d and self.inLineSegment(intersect, line):
+                d = help
+
+        if d == 10:
+            d = 0
+
+        return d
+
+    def getDistance_from_shape_old(self, shape):
+        if self.outOfBounds(self.getPosition()) or self.outOfBounds(shape.getPosition()):
+            return -1
+
+        op1, op2, op3, op4, op5, op6, op7, op8 = shape.getEdgePoints(shape.getPosition())
+        opoints = [op1, op2, op3, op4, op5, op6, op7, op8]
+
+        oplane1 = self.getPlane(op1, op5)
+        oplane2 = self.getPlane(op1, op2)
+        oplane3 = self.getPlane(op1, op3)
+
+        oplane11 = self.getPlane(op8, op4)
+        oplane21 = self.getPlane(op8, op7)
+        oplane31 = self.getPlane(op8, op6)
+
+        oplanes = [[oplane1, oplane2, oplane3, oplane11, oplane21, oplane31], [[op1, op2, op3], [op1, op3, op5],
+                                                                                   [op1, op2, op5], [op8, op7, op6],
+                                                                                   [op8, op4, op6], [op8, op4, op7]]]
+
+        oline1 = self.getLine(op1, op2)
+        oline2 = self.getLine(op1, op5)
+        oline3 = self.getLine(op5, op6)
+        oline4 = self.getLine(op2, op6)
+        oline5 = self.getLine(op3, op4)
+        oline6 = self.getLine(op3, op7)
+        oline7 = self.getLine(op7, op8)
+        oline8 = self.getLine(op4, op8)
+        oline9 = self.getLine(op5, op7)
+        oline10 = self.getLine(op1, op6)
+        oline11 = self.getLine(op2, op4)
+        oline12 = self.getLine(op6, op8)
+
+        olines = [oline1, oline2, oline3, oline4, oline5, oline6, oline7, oline8, oline9, oline10, oline11, oline12]
+
+        p1, p2, p3, p4, p5, p6, p7, p8 = self.getEdgePoints(self.getPosition())
+        points = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+        plane1 = self.getPlane(p1, p5)
+        plane2 = self.getPlane(p1, p2)
+        plane3 = self.getPlane(p1, p3)
+
+        plane11 = self.getPlane(p8, p4)
+        plane21 = self.getPlane(p8, p7)
+        plane31 = self.getPlane(p8, p6)
+
+        planes = [[plane1, plane2, plane3, plane11, plane21, plane31], [[p1, p2, p3], [p1, p3, p5], [p1, p2, p5],
+                                                                        [p8, p7, p6], [p8, p4, p6], [p8, p4, p7]]]
+        line1 = self.getLine(p1, p2)
+        line2 = self.getLine(p1, p5)
+        line3 = self.getLine(p5, p6)
+        line4 = self.getLine(p2, p6)
+        line5 = self.getLine(p3, p4)
+        line6 = self.getLine(p3, p7)
+        line7 = self.getLine(p7, p8)
+        line8 = self.getLine(p4, p8)
+        line9 = self.getLine(p5, p7)
+        line10 = self.getLine(p1, p6)
+        line11 = self.getLine(p2, p4)
+        line12 = self.getLine(p6, p8)
+
+        lines = [line1, line2, line3, line4, line5, line6, line7, line8, line9, line10, line11, line12]
+
+        d = 10
+
+        for p in points:
+            for i in range(6):
+                help, intersect = self.getDistanceFromPlane_intersect(oplanes[0][i], p)
+                help = abs(help)
+                if help < d:
+                    #print("plane: " + str(oplanes[0][i]) + str(oplanes[1][i]))
+                    #print("point: " + str(p))
+                    #print("help: " + str(help))
+                    #print("intersect: " + str(intersect))
+                    if self.inRectangle(intersect, oplanes[1][i]):
+                        #print("Got it")
+                        d = help
+
+        for p in opoints:
+            for i in range(6):
+                help, intersect = self.getDistanceFromPlane_intersect(planes[0][i], p)
+                help = abs(help)
+                if help < d and self.inRectangle(intersect, planes[1][i]):
+                    d = help
+
+        for line in lines:
+            for oline in olines:
+                if self.lines_parallel(line, oline):
+                    help = self.distance_point_line(line[0], oline)
+                    if help < d:
+                        d = help
+
+        return d
+
+    def getDistances(self, shapes):
+        distances = []
+        for shape in shapes:
+            distances.append(self.getDistance_from_shape(shape))
+
+        return distances
+
     def setColor(self, r, g, b):
         object_handle = self.handle
         return_code, _, _, _, _ = sim.simxCallScriptFunction(self.clientID, "ForScript", sim.sim_scripttype_childscript,
@@ -320,46 +642,6 @@ class Shape:
         return_code, _, _, _, _ = sim.simxCallScriptFunction(self.clientID, "ForScript", sim.sim_scripttype_childscript,
                                                              "setObjectShape_function", [object_handle], [x, y, z],
                                                              [], bytearray(), sim.simx_opmode_blocking)
-
-    def getPositionRelation(self, shape):
-        xRelation = shape.getPosition()[0] - self.getPosition()[0]
-        if xRelation > 0:
-            xRelation -= abs(shape.getBoundingBoxWorld()[0] * 0.5) + abs(self.getBoundingBoxWorld()[0] * 0.5)
-        else:
-            xRelation += abs(shape.getBoundingBoxWorld()[0] * 0.5) + abs(self.getBoundingBoxWorld()[0] * 0.5)
-        yRelation = shape.getPosition()[1] - self.getPosition()[1]
-        if yRelation > 0:
-            yRelation -= abs(shape.getBoundingBoxWorld()[1] * 0.5) + abs(self.getBoundingBoxWorld()[1] * 0.5)
-        else:
-            yRelation += abs(shape.getBoundingBoxWorld()[1] * 0.5) + abs(self.getBoundingBoxWorld()[1] * 0.5)
-        zRelation = shape.getPosition()[2] - self.getPosition()[2]
-        if zRelation > 0:
-            zRelation -= abs(shape.getBoundingBoxWorld()[2] * 0.5) + abs(self.getBoundingBoxWorld()[2] * 0.5)
-        else:
-            zRelation += abs(shape.getBoundingBoxWorld()[2] * 0.5) + abs(self.getBoundingBoxWorld()[2] * 0.5)
-        relation = [xRelation, yRelation, zRelation]
-        return relation
-
-    # TO DO!!!
-    def getRelationLikelihood(self, relationType, shape, agent):
-        # probabilitySpace: {"preposition" -> [gaussX,gaussY,gaussZ]}
-        if relationType in agent.probabilitySpace:
-            gaussXr = agent.probabilitySpace[relationType][0]
-            gaussXl = agent.probabilitySpace[relationType][1]
-            gaussYb = agent.probabilitySpace[relationType][2]
-            gaussYf = agent.probabilitySpace[relationType][3]
-            gaussZh = agent.probabilitySpace[relationType][4]
-            gaussZl = agent.probabilitySpace[relationType][5]
-
-            positionRelation = self.getPositionRelation(shape)
-
-            likelihood = (gaussXl.getProbability(positionRelation[0]) * 2 + gaussXr.getProbability(
-                positionRelation[0]) * 2 + gaussYb.getProbability(positionRelation[1]) * 2 + gaussYf.getProbability(
-                positionRelation[1]) * 2 + gaussZh.getProbability(positionRelation[2]) * 2 + gaussZl.getProbability(
-                positionRelation[2]) * 2) / 6
-            return likelihood
-        else:
-            print("false preposition")
 
     def getRelativePosition(self, object, position, first):
         if first:
@@ -405,7 +687,77 @@ class Shape:
                 print("error: no positional relation")
                 return [-1, -1, -1, -1, -1, -1, -1, -1]
 
+    def get_relative_position_simple(self, object, position, first):
+        if first:
+            return [0, 0, -1]
+
+        op = object.getPosition()
+        sbb = self.getBoundingBoxWorld()
+
+        if self.sameObject(op, position):
+            return [0, 0, 0]
+        if self.tooFarAway(op, position):
+            return [0, 0, -1]
+
+        p = [0, 0, 0]
+        p[0] = position[0] - op[0]
+        p[1] = position[1] - op[1]
+        p[2] = position[2] - sbb[2] * 0.5
+
+        return p
+
+
     # "set" functions
+    def set_relative_position_simple(self, position, object, shapelist):
+        op = object.getPosition()
+        p = [0, 0, 0]
+        p[0] = position[0] + op[0]
+        p[1] = position[1] + op[1]
+        p[2] = position[2] + self.getBoundingBoxWorld()[2] * 0.5
+
+        self.setPosition(p, shapelist)
+
+        return p
+
+    def perform_random_simple_action(self, object, number, leftright, frontback, up, shapeslist):
+        sbb = self.getBoundingBoxWorld()
+        obb = object.getBoundingBoxWorld()
+        if number == 0:
+            position = self.set_relative_position_simple([0.5 + leftright, frontback, up],
+                                                         object, shapeslist)
+        elif number == 1:
+            position = self.set_relative_position_simple([- 0.5 + leftright, frontback, up],
+                                                         object, shapeslist)
+        elif number == 2:
+            position = self.set_relative_position_simple([leftright, - 0.5 + frontback, up],
+                                                         object, shapeslist)
+        elif number == 3:
+            position = self.set_relative_position_simple([leftright, 0.5 + frontback, up],
+                                                         object, shapeslist)
+        else:
+            position = self.set_relative_position_simple([leftright, frontback, obb[2]],
+                                                         object, shapeslist)
+
+        position = self.get_relative_position_simple(object, position, False)
+
+        return position
+
+    def performRandomActionVariable(self, object, number, leftright, frontback, shapeslist):
+        if number == 0:
+            position = self.moveLeftOfVariable(object, leftright, frontback, shapeslist)
+        elif number == 1:
+            position = self.moveRightOfVariable(object, leftright, frontback, shapeslist)
+        elif number == 2:
+            position = self.moveInFrontOfVariable(object, leftright, frontback, shapeslist)
+        elif number == 3:
+            position = self.moveBehindVariable(object, leftright, frontback, shapeslist)
+        else:
+            position = self.setAtopVariable(object, leftright, frontback, shapeslist)
+
+        position = self.getRelativePosition(object, position, first=False)
+
+        return position
+
     def setPosition(self, position, shapelist):
         bb = self.getBoundingBoxWorld()
         #inSpaceOf, shape = self.inSpaceOf(position, shapelist, bb)
@@ -446,7 +798,7 @@ class Shape:
 
     def set_relative_position(self, position, object, leftright, frontback, shapelist):
         position = position.to(device="cpu")
-        number = np.argmax(position)
+        number = np.argmax(position.detach().numpy())
         if self.sameObject(object.getPosition(), self.getPosition()):
             self.moveTo(0, 0, shapelist)
         elif number == 0:
@@ -529,6 +881,21 @@ class Shape:
         else:
             self.setPointOrientation(orientation, l_index, s_index)
 
+    def setVisualOrientation_simple(self, orig_orientation):
+        orientation = [0, 0, 0, 0, 0]
+        orientation[0] = orig_orientation[0]
+        orientation[1] = orig_orientation[1]
+        orientation[2] = orig_orientation[2]
+        orientation[3] = decode_orientation(orig_orientation[3], orig_orientation[4])
+        orientation[4] = orig_orientation[5]
+
+        if orientation[0] == 1:
+            self.setPlaneOrientation_simple(orientation)
+        elif orientation[1] == 1:
+            self.setEdgeOrientation_simple(orientation)
+        else:
+            self.setPointOrientation_simple(orientation)
+
     def rotatePlaneOrientation(self, upaxis, frontaxis, rotation):
         new_or = [0, 0, 0]
         if upaxis == 0:
@@ -606,6 +973,29 @@ class Shape:
                     new_or[2] = math.pi/2 + rotation
         return new_or
 
+    def rotateEdgeOrientation_simple(self, rotation, forwardfacing):
+        new_or = [0, 0, 0]
+        if forwardfacing:
+            new_or[0] = math.pi - math.pi / 4 + 0.3
+            new_or[2] = rotation
+        else:
+            new_or[0] = math.pi / 4 - 0.3
+            new_or[2] = rotation
+
+        return new_or
+
+    def setEdgeOrientation_simple(self, orientation):
+        rotation = math.asin(orientation[3])
+        forwardfacing = False
+        if orientation[4] > 0.5:
+            forwardfacing = True
+
+        new_or = self.rotateEdgeOrientation_simple(rotation, forwardfacing)
+
+        adjusted_or = self.rotationfromWorldAxis(new_or[0], new_or[1], new_or[2])
+
+        self.setradianOrientation(adjusted_or)
+
     def setEdgeOrientation(self, orientation, l_index, s_index):
         m_index = [0, 1, 2]
         m_index.remove(l_index)
@@ -622,6 +1012,14 @@ class Shape:
             new_or = self.rotateEdgeOrientation(s_index, l_index, rotation, forwardfacing)
         else:
             new_or = self.rotateEdgeOrientation(m_index, l_index, rotation, forwardfacing)
+
+        adjusted_or = self.rotationfromWorldAxis(new_or[0], new_or[1], new_or[2])
+
+        self.setradianOrientation(adjusted_or)
+
+    def setPointOrientation_simple(self, orientation):
+
+        new_or = self.rotatePointOrientation_simple()
 
         adjusted_or = self.rotationfromWorldAxis(new_or[0], new_or[1], new_or[2])
 
@@ -681,6 +1079,14 @@ class Shape:
 
         self.setradianOrientation(adjusted_or)
 
+    def rotatePointOrientation_simple(self):
+        new_or = [0, 0, 0]
+        new_or[0] = math.pi/4
+        new_or[1] = - math.pi/4
+        new_or[2] = math.pi/4
+
+        return new_or
+
     def rotatePointOrientation(self, num_front, frontfacing1, frontfacing2, simple):
         new_or = [0, 0, 0]
         if simple:
@@ -723,6 +1129,19 @@ class Shape:
             new_or[2] = rotate
 
         return new_or
+
+    def rotatePlaneOrientation_simple(self, rotation):
+        new_or = [0, 0, 0]
+        new_or[2] = rotation
+
+        return new_or
+
+    def setPlaneOrientation_simple(self, orientation):
+        rotation = math.asin(orientation[3])
+
+        new_or = self.rotatePlaneOrientation_simple(rotation)
+
+        self.setradianOrientation(new_or)
 
     def setPlaneOrientation(self, orientation, l_index, s_index):
         m_index = [0, 1, 2]
@@ -887,22 +1306,6 @@ class Shape:
 
         return position
 
-    def performRandomActionVariable(self, object, number, leftright, frontback, shapeslist):
-        if number == 0:
-            position = self.moveLeftOfVariable(object, leftright, frontback, shapeslist)
-        elif number == 1:
-            position = self.moveRightOfVariable(object, leftright, frontback, shapeslist)
-        elif number == 2:
-            position = self.moveInFrontOfVariable(object, leftright, frontback, shapeslist)
-        elif number == 3:
-            position = self.moveBehindVariable(object, leftright, frontback, shapeslist)
-        else:
-            position = self.setAtopVariable(object, leftright, frontback, shapeslist)
-
-        position = self.getRelativePosition(object, position, first=False)
-
-        return position
-
     def turnOriginalWayUp(self):
         self.setOrientation([0, 1, 0, 1, self.getOrientation()[4], self.getOrientation()[5]])
 
@@ -949,8 +1352,9 @@ class Shape:
             oplane21 = self.getPlane(op8, op7)
             oplane31 = self.getPlane(op8, op6)
 
-            oplanes = [[oplane1, oplane2, oplane3, oplane11, oplane21, oplane31], [[op1, op2, op3], [op1, op3, op5], [op1, op2, op5],
-                                                                            [op8, op7, op6], [op8, op4, op6], [op8, op4, op7]]]
+            oplanes = [[oplane1, oplane2, oplane3, oplane11, oplane21, oplane31], [[op1, op2, op3], [op1, op3, op5],
+                                                                                   [op1, op2, op5], [op8, op7, op6],
+                                                                                   [op8, op4, op6], [op8, op4, op7]]]
 
             oline1 = self.getLine(op1, op2)
             oline2 = self.getLine(op1, op5)
@@ -977,6 +1381,7 @@ class Shape:
                             # test if intersection lies in rectangle of plane
                             if self.inRectangle(intersection, planes[1][i]):
                                 return True, obj
+
             #print(2)
             for line in lines:
                 for i in range(6):
@@ -996,6 +1401,27 @@ class Shape:
                                 #print("Rectangle points " + str(oplanes[1][i]))
                                 #print("in rectangle")
                                 return True, obj
+            d = 1
+            for point in points:
+                for i in range(6):
+                    d = self.getDistanceFromPlane(oplanes[0][i], point)
+                    if d < 0:
+                        break
+                if d < 0:
+                    break
+            if d >= 0:
+                return True, obj
+
+            d = 1
+            for point in opoints:
+                for i in range(6):
+                    d = self.getDistanceFromPlane(planes[0][i], point)
+                    if d < 0:
+                        break
+                if d < 0:
+                    break
+            if d >= 0:
+                return True, obj
 
         return False, self
 
@@ -1049,6 +1475,44 @@ class Shape:
 
         return 0 <= u <= 1 and 0 <= v <= 1
 
+    def inRectangle_lenient(self, s, points):
+        a = self.vectorSubtraction(points[1], points[0])
+        b = self.vectorSubtraction(points[2], points[0])
+        p = points[0]
+
+        if a[0] != 0:
+            e = s[0] / a[0]
+            c = p[0] / a[0]
+            d = b[0] / a[0]
+            if b[1] - d * a[1] != 0:
+                v = (s[1] - p[1] - e * a[1] + c * a[1]) / (b[1] - d * a[1])
+                u = e - c - v * d
+            else:
+                v = (s[2] - p[2] - e * a[2] + c * a[2]) / (b[2] - d * a[2])
+                u = e - c - v * d
+        elif a[1] != 0:
+            e = s[1] / a[1]
+            c = p[1] / a[1]
+            d = b[1] / a[1]
+            if b[2] - d * a[2] != 0:
+                v = (s[2] - p[2] - e * a[2] + c * a[2]) / (b[2] - d * a[2])
+                u = e - c - v * d
+            else:
+                v = (s[0] - p[0] - e * a[0] + c * a[0]) / (b[0] - d * a[0])
+                u = e - c - v * d
+        else:
+            e = s[2] / a[2]
+            c = p[2] / a[2]
+            d = b[2] / a[2]
+            if b[1] - d * a[1] != 0:
+                v = (s[1] - p[1] - e * a[1] + c * a[1]) / (b[1] - d * a[1])
+                u = e - c - v * d
+            else:
+                v = (s[0] - p[0] - e * a[0] + c * a[0]) / (b[0] - d * a[0])
+                u = e - c - v * d
+
+        return -0.05 <= u <= 1.05 and -0.05 <= v <= 1.05
+
     def scalarProduct(self, p, n):
         return p[0]*n[0] + p[1]*n[1] + p[2]*n[2]
 
@@ -1073,8 +1537,44 @@ class Shape:
     def getDistanceFromPlane(self, plane, p):
         return self.scalarProduct(plane[0], self.vectorSubtraction(p, plane[1]))
 
+    def lines_parallel(self, line1, line2):
+        scalar = self.scalarProduct(line1[1], line2[1])
+        len1 = self.vectorLength(line1[1])
+        len2 = self.vectorLength(line2[1])
+        product = len1 * len2
+
+        return product - 0.005 < scalar < product + 0.005
+
+    def perpendicular_point_line(self, point, line):
+        no = self.vectorDivision(line[1], self.vectorLength(line[1]))
+        helper_plane = [no, point]
+        _, intersection, _ = self.intersect(helper_plane, line)
+
+        return intersection
+
+    def getDistanceFromPlane_intersect(self, plane, p):
+        d = self.scalarProduct(plane[0], self.vectorSubtraction(p, plane[1]))
+        lot = self.vectorMultiplication(plane[0], d)
+        lot = self.vectorNegation(lot)
+        int = self.vectorAddition(lot, p)
+        return d, int
+
+    def cross_product(self, v1, v2):
+        return [v1[1]*v2[2] - v1[2]*v2[1], v1[2]*v2[0] - v1[0]*v2[2], v1[0]*v2[1] - v1[1]*v2[0]]
+
     def getLine(self, p1, p2):
         return [p1, self.vectorSubtraction(p2, p1)]
+
+    def distance_point_line(self, point, line):
+        help_vector = self.vectorSubtraction(point, line[0])
+        cp = self.cross_product(help_vector, line[1])
+        if self.vectorLength(line[1]) == 0:
+            print("length of line 0")
+            print(line)
+            exit()
+        d = self.vectorLength(cp)/self.vectorLength(line[1])
+
+        return d
 
     def intersect(self, plane, line):
         if self.scalarProduct(plane[0], line[1]) == 0:
@@ -1365,3 +1865,33 @@ class Shape:
         r_object = r.as_euler('XYZ', degrees=False)
 
         return r_object
+
+def encode_orientation(value):
+    if value > 0:
+        pi_help = math.pi / math.sqrt(.5) * value
+    else:
+        pi_help = math.pi + math.pi / math.sqrt(.5) * (math.sqrt(.5) + value)
+
+    cos_value = math.cos(pi_help)
+    sin_value = math.sin(pi_help)
+
+    return cos_value, sin_value
+
+def decode_orientation(cos_value, sin_value):
+    asin_value = math.asin(sin_value)
+    neg_asin = math.asin(-sin_value)
+    acos_value = math.acos(cos_value)
+
+    if sin_value >= 0:
+        if cos_value >= 0:
+            mean = (acos_value + asin_value)/2
+        else:
+            mean = (acos_value + math.pi - asin_value)/2
+    else:
+        if cos_value < 0:
+            mean = - (acos_value + math.pi - neg_asin)/2
+        else:
+            mean = - (acos_value + neg_asin) / 2
+
+    return mean * math.sqrt(.5) / math.pi
+

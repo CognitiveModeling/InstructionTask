@@ -21,17 +21,21 @@ orig_states_target = torch.FloatTensor(orig_states_target).to(device="cuda")
 orig_positions = torch.FloatTensor(orig_positions).to(device="cuda")
 orig_agents = torch.FloatTensor(orig_agents).to(device="cuda")
 
-batch_sz = 200
+batch_sz = 100
 n_actions = 5
 n_agents = 3
-block_sz = 26 * n_agents
 n_states = n_actions + 1
+n_size = 1
+n_color = 3
+n_type = 1
 n_positions = 8
-n_orientations = 11
+n_orientations = 5
+n_distances = 2
 action_size = n_positions + n_orientations
-n_single_state = n_positions + n_orientations + 7
+n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color
+block_sz = n_agents * n_single_state
 
-net = attention_net.Net(batch_sz, n_agents, n_actions).to(device="cuda")
+net = attention_net.Net(batch_sz, n_agents, n_actions, vector_dim=64).to(device="cuda")
 
 optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
@@ -53,7 +57,7 @@ orig_agents = orig_agents.view(n_samples, n_actions, 1)
 batches = list(range(int(n_samples/batch_sz)))
 samples_list = list(range(n_samples))
 
-for epoch in range(3000):
+for epoch in range(500):
     #random.shuffle(batches)
 
     #random.shuffle(samples_list)
@@ -85,6 +89,9 @@ for epoch in range(3000):
             positions_batch = positions[:, i_batch, idx, :]
             blocks_batch = blocks[:, i_batch, idx, :]
             targets_batch = states_target[:, i_batch, idx, :]
+            helper = targets_batch[:, -1].view(batch_sz, 1)
+
+            targets_batch = torch.cat((targets_batch, helper.repeat(1, 2)), dim=-1)
 
             #print("states: " + str(states_batch))
             #print("positions: " + str(positions_batch))
@@ -93,7 +100,7 @@ for epoch in range(3000):
 
             out = net(states_batch, blocks_batch, positions_batch)
 
-            loss = net.loss(out.view(batch_sz, block_sz + 1), targets_batch.view(batch_sz, block_sz + 1))
+            loss = net.loss(out.view(batch_sz, block_sz + 3), targets_batch.view(batch_sz, block_sz + 3))
 
             current_losses.append(loss)
 
@@ -112,7 +119,7 @@ for epoch in range(3000):
 
     print(str(epoch) + ": " + str(mean_loss))
 
-    PATH = "state_dict_model_relative_additional_6000samples_attention_net_128.pt"
+    PATH = "state_dict_model_6000samples_attention_net_64_conf10_3.pt"
 
     # Save
     torch.save(net.state_dict(), PATH)

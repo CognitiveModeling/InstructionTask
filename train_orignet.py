@@ -25,15 +25,19 @@ batch_sz = 100
 n_actions = 5
 n_agents = 3
 n_states = n_actions + 1
+n_size = 1
+n_color = 3
+n_type = 1
 n_positions = 8
-n_orientations = 11
+n_orientations = 5
+n_distances = 2
 action_size = n_positions + n_orientations
-n_single_state = n_positions + n_orientations + 7
+n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color
 block_sz = n_agents * n_single_state
 
 net = net.Net(batch_sz, n_agents, n_actions).to(device="cuda")
 
-optimizer = torch.optim.Adam(net.parameters(), lr=0.0001)
+optimizer = torch.optim.Adam(net.parameters(), lr=0.00001)
 
 orig_states = orig_states.view(n_samples, n_states, block_sz)
 orig_states_target = orig_states_target.view(n_samples, n_actions, block_sz + 1)
@@ -112,7 +116,7 @@ for epoch in range(3000):
 
     print(str(epoch) + ": " + str(mean_loss))
 
-    PATH = "state_dict_model_relative_additional_6000samples_orig_net_linear.pt"
+    PATH = "state_dict_model_4700samples_orig_net_0.00001.pt"
 
     # Save
     torch.save(net.state_dict(), PATH)

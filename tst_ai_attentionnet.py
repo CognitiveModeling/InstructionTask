@@ -21,19 +21,26 @@ with open('test_agents_relative_additional.json') as json_file:
         agents = json.load(json_file)
 
 n_samples = len(states)
-state_sz = 26
 n_blocks = 3
-block_sz = state_sz * n_blocks
-n_positions = 19
-n_orientations = 11
-seq_len = n_blocks
+n_position = 8
+seq_len = n_blocks + 2
 criterion = nn.MSELoss()
 timesteps = seq_len
 batch_sz = 1
 n_states = seq_len + 1
-n_single_state = n_positions + 7
 
-random_tests = 5000
+n_size = 1
+n_color = 3
+n_type = 1
+n_orientations = 5
+n_positions = n_position + n_orientations
+n_distances = 2
+action_size = n_positions + n_orientations
+n_single_state = n_positions + n_distances + n_size + n_type + n_color
+block_sz = n_single_state * n_blocks
+state_sz = n_single_state
+
+random_tests = 1000
 
 states = torch.FloatTensor(states).to(device="cuda")
 positions = torch.FloatTensor(positions).to(device="cuda")
@@ -56,15 +63,15 @@ for i in range(seq_len):
 if not os.path.exists('eval_results'):
         os.makedirs('eval_results')
 
-PATH = "state_dict_model_relative_additional_6000samples_attention_net.pt"
+PATH = "state_dict_model_6000samples_attention_net_64_conf10_3.pt"
 
-net = attention_net.Net(batch_sz, n_blocks, timesteps).to(device="cuda")
+net = attention_net.Net(batch_sz, n_blocks, timesteps, vector_dim=64).to(device="cuda")
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
 net.eval()
 
 
 def create_base_target_state(state):
-    for_cat = torch.ones(n_states, 1).to(device="cuda")
+    for_cat = torch.ones(n_states, 3).to(device="cuda")
     return torch.cat((state, for_cat), dim=-1)
 
 
@@ -92,24 +99,6 @@ if clientID!=-1:
         cu = 0
         cy = 0
         s = 0
-
-        #current_hidden = net.init()
-
-        cuboid1 = shapes.Shape(clientID, "Cuboid", 0)
-        cuboid2 = shapes.Shape(clientID, "Cuboid", 1)
-        cuboid3 = shapes.Shape(clientID, "Cuboid", 2)
-        cuboid4 = shapes.Shape(clientID, "Cuboid", 3)
-        cuboid5 = shapes.Shape(clientID, "Cuboid", 4)
-        sphere1 = shapes.Shape(clientID, "Sphere", 0)
-        sphere2 = shapes.Shape(clientID, "Sphere", 1)
-        cylinder1 = shapes.Shape(clientID, "Cylinder", 0)
-        cylinder2 = shapes.Shape(clientID, "Cylinder", 1)
-        cylinder3 = shapes.Shape(clientID, "Cylinder", 2)
-        cylinder4 = shapes.Shape(clientID, "Cylinder", 3)
-        cylinder5 = shapes.Shape(clientID, "Cylinder", 4)
-
-        allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
-                 sphere2, sphere1]
 
         reshape = []
         arrangement = []
@@ -157,8 +146,8 @@ if clientID!=-1:
                 shape = shapeslist[i_shape]
 
                 x = states[0, i_batch, b, i_shape * state_sz + 4] * 2
-                y = states[0, i_batch, b, i_shape * state_sz + 5] * 2
-                z = states[0, i_batch, b, i_shape * state_sz + 6] * 2
+                y = x
+                z = x
 
                 xb = 1 / x
                 yb = 1 / y
@@ -183,172 +172,152 @@ if clientID!=-1:
 
         all_blocks = list(range(3))
 
-        for idx in range(seq_len):
+        for idx in range(3):
             print(idx)
             current_loss = 1000
 
             if idx == 1:
                 all_blocks.remove(first_block)
 
-            print(all_blocks)
+            #print(all_blocks)
             if idx != 0:
                 for bl in range(0, n_blocks):
                     p_help = shapeslist[bl].getPosition()
                     p = shapeslist[bl].getRelativePosition(shapeslist[first_block], p_help, False)
-                    o = shapeslist[bl].getOrientationType()
+                    o = shapeslist[bl].getOrientationType_simple()
                     c = shapeslist[bl].getColor()
-                    bb = shapeslist[bl].getBoundingBox()
+                    bb = shapeslist[bl].getBoundingBox()[0]
                     t = shapeslist[bl].getType()
-
+                    d = shapeslist[bl].getDistances(withoutAll[bl])
                     state = state.view(1, 1, block_sz)
 
                     state[0][0][bl * state_sz] = t
                     state[0][0][bl * state_sz + 1] = c[0]
                     state[0][0][bl * state_sz + 2] = c[1]
                     state[0][0][bl * state_sz + 3] = c[2]
-                    state[0][0][bl * state_sz + 4] = bb[0]
-                    state[0][0][bl * state_sz + 5] = bb[1]
-                    state[0][0][bl * state_sz + 6] = bb[2]
-                    state[0][0][bl * state_sz + 7] = p[0]
-                    state[0][0][bl * state_sz + 8] = p[1]
-                    state[0][0][bl * state_sz + 9] = p[2]
-                    state[0][0][bl * state_sz + 10] = p[3]
-                    state[0][0][bl * state_sz + 11] = p[4]
-                    state[0][0][bl * state_sz + 12] = p[5]
-                    state[0][0][bl * state_sz + 13] = p[6]
-                    state[0][0][bl * state_sz + 14] = p[7]
-                    state[0][0][bl * state_sz + 15] = o[0]
-                    state[0][0][bl * state_sz + 16] = o[1]
-                    state[0][0][bl * state_sz + 17] = o[2]
-                    state[0][0][bl * state_sz + 18] = o[3]
-                    state[0][0][bl * state_sz + 19] = o[4]
-                    state[0][0][bl * state_sz + 20] = o[5]
-                    state[0][0][bl * state_sz + 21] = o[6]
-                    state[0][0][bl * state_sz + 22] = o[7]
-                    state[0][0][bl * state_sz + 23] = o[8]
-                    state[0][0][bl * state_sz + 24] = o[9]
-                    state[0][0][bl * state_sz + 25] = o[10]
+                    state[0][0][bl * state_sz + 4] = bb
+                    state[0][0][bl * state_sz + 5] = p[0]
+                    state[0][0][bl * state_sz + 6] = p[1]
+                    state[0][0][bl * state_sz + 7] = p[2]
+                    state[0][0][bl * state_sz + 8] = p[3]
+                    state[0][0][bl * state_sz + 9] = p[4]
+                    state[0][0][bl * state_sz + 10] = p[5]
+                    state[0][0][bl * state_sz + 11] = p[6]
+                    state[0][0][bl * state_sz + 12] = p[7]
+                    state[0][0][bl * state_sz + 13] = o[0]
+                    state[0][0][bl * state_sz + 14] = o[1]
+                    state[0][0][bl * state_sz + 15] = o[2]
+                    state[0][0][bl * state_sz + 16] = o[3]
+                    state[0][0][bl * state_sz + 17] = o[4]
+                    state[0][0][bl * state_sz + 18] = d[0]
+                    state[0][0][bl * state_sz + 19] = d[1]
 
                     state = state.to(device="cuda")
 
                 #hidden = current_hidden
 
-            for b in range(batch_sz):
-                state = state.view(1, n_blocks, n_single_state)
-                #print(state)
-                #print(target)
 
-                for trial in range(random_tests):
+            state = state.view(1, n_blocks, n_single_state)
+            #print(state)
+            #print(target)
 
-                    # actionsequence = torch.zeros([seq_len, batch_sz, n_positions]).to(device="cuda")
-                    blocks_choice = torch.zeros([seq_len, batch_sz, n_blocks]).to(device="cuda")
+            for trial in range(random_tests):
 
-                    if trial % 1000 == 0:
-                    #if trial % 1 == 0:
-                        print("test trial " + str(trial))
-                        print("current loss: " + str(current_loss))
-                    po = torch.zeros([batch_sz, n_positions]).to(device="cuda")
+                # actionsequence = torch.zeros([seq_len, batch_sz, n_positions]).to(device="cuda")
+                blocks_choice = torch.zeros([seq_len, batch_sz, n_blocks]).to(device="cuda")
 
-                    p = np.random.randint(0, 5)
+                if trial % 1000 == 0:
+                #if trial % 1 == 0:
+                    print("test trial " + str(trial))
+                    print("current loss: " + str(current_loss))
+                po = torch.zeros([batch_sz, n_positions]).to(device="cuda")
 
-                    p1 = np.random.uniform(-0.3, 0.3)
-                    p2 = np.random.uniform(-0.3, 0.3)
-                    p3 = np.random.uniform(-0.3, 0.3)
+                p = np.random.randint(0, 5)
 
-                    current_block = torch.zeros([batch_sz, n_blocks])
-                    block_choice = np.random.choice(all_blocks)
-                    #all_blocks.remove(block_choice)
-                    current_block[b, block_choice] = 1
-                    current_block = current_block.view(1, batch_sz, n_blocks).to(device="cuda")
+                p1 = np.random.uniform(-0.3, 0.3)
+                p2 = np.random.uniform(-0.3, 0.3)
+                p3 = np.random.uniform(-0.3, 0.3)
 
-                    orientation_type = [0, 0, 0, 0, 0, 0, 0, 0]
-                    facing_choices = [0, 0, 0]
+                current_block = torch.zeros([batch_sz, n_blocks])
+                block_choice = np.random.choice(all_blocks)
+                #all_blocks.remove(block_choice)
+                current_block[0, block_choice] = 1
+                current_block = current_block.view(1, batch_sz, n_blocks).to(device="cuda")
 
-                    type_choice = np.random.randint(0, 8)
+                orientation_type = [0, 0, 0]
+                facing_choices = [0, 0]
 
-                    orientation_type[type_choice] = 1
+                type_choice = np.random.randint(0, 3)
 
-                    if type_choice == 0 or type_choice == 1 or type_choice == 2:
-                        facing_choices[0] = np.random.uniform(- 1, 1)
-                        facing_choices[1] = mathown.get_cos(facing_choices[0])
-                    elif type_choice == 3 or type_choice == 4 or type_choice == 5:
-                        facing_choices[0] = np.random.uniform(- 1, 1)
-                        facing_choices[1] = mathown.get_cos(facing_choices[0])
-                        facing = [0, 1]
-                        facing_choice = np.random.choice(facing)
-                        facing_choices[2] = facing_choice
-                    else:
-                        num = [1, 2]
-                        num_choice = np.random.choice(num)
-                        facing = [0, 1, 2]
+                orientation_type[type_choice] = 1
 
-                        facing_choice = np.random.choice(facing, num_choice)
+                if type_choice == 0:
+                    facing_choices[0] = np.random.uniform(- 1, 1)
+                elif type_choice == 1:
+                    facing_choices[0] = np.random.uniform(- 1, 1)
+                    facing = [0, 1]
+                    facing_choice = np.random.choice(facing)
+                    facing_choices[1] = facing_choice
 
-                        if num_choice == 2:
-                            facing_choices[facing_choice[0]] = 1
-                            facing_choices[facing_choice[1]] = 1
-                        else:
-                            facing_choices[facing_choice[0]] = 1
+                if idx == 0:
+                    po[0] = torch.tensor(
+                        [0, 0, 0, 0, 0, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
+                elif p == 0:
+                    po[0] = torch.tensor(
+                        [1, 0, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
+                elif p == 1:
+                    po[0] = torch.tensor(
+                        [0, 1, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
+                elif p == 2:
+                    po[0] = torch.tensor(
+                        [0, 0, 1, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
+                elif p == 3:
+                    po[0] = torch.tensor(
+                        [0, 0, 0, 1, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
+                else:
+                    po[0] = torch.tensor(
+                        [0, 0, 0, 0, 1, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
+                         facing_choices[0], facing_choices[1]])
 
-                    if idx == 0:
-                        po[b] = torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 0:
-                        po[b] = torch.tensor([1, 0, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 1:
-                        po[b] = torch.tensor([0, 1, 0, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 2:
-                        po[b] = torch.tensor([0, 0, 1, 0, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    elif p == 3:
-                        po[b] = torch.tensor([0, 0, 0, 1, 0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
-                    else:
-                        po[b] = torch.tensor([0, 0, 0, 0, 1, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2], orientation_type[3],
-                         orientation_type[4], orientation_type[5], orientation_type[6], orientation_type[7],
-                         facing_choices[0], facing_choices[1], facing_choices[2]])
+                po = po.view(1, batch_sz, n_positions).to(device="cuda")
+                #actionsequence[idx] = po
+                #blocks_choice[idx] = current_block
+                #po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
+                if idx == 0:
+                    current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
 
-                    po = po.view(1, batch_sz, n_positions).to(device="cuda")
-                    #actionsequence[idx] = po
-                    #blocks_choice[idx] = current_block
-                    #po = positions_target[idx].view(1, batch_sz, n_positions).to(device="cuda")
-                    if idx == 0:
-                        current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
+                new_state = net(state, current_block, po)
 
-                    new_state = net(state, current_block, po)
+                #state = state.to(device="cuda")
 
-                    #state = state.to(device="cuda")
+                #del po
+                #del current_block
 
-                    #del po
-                    #del current_block
+                loss = net.loss(new_state.view(batch_sz, block_sz + 3), ai_target[seq_len].view(batch_sz, block_sz + 3))
 
-                    loss = net.loss(new_state.view(batch_sz, block_sz + 1), ai_target[seq_len].view(batch_sz, block_sz + 1))
+                #print("state: " + str(state))
+                #print("position: " + str(po))
+                #print("block: " + str(current_block))
+                #print("prediction: " + str(new_state))
+                #print("target " + str(target[idx + 1].view(1, batch_sz, block_sz)))
+                #print("loss: " + str(loss.mean()))
 
-                    #print("state: " + str(state))
-                    #print("position: " + str(po))
-                    #print("block: " + str(current_block))
-                    #print("prediction: " + str(new_state))
-                    #print("target " + str(target[idx + 1].view(1, batch_sz, block_sz)))
-                    #print("loss: " + str(loss.mean()))
+                if loss.mean() < current_loss:
+                    current_loss = loss.mean().to(device="cuda")
+                    current_full_loss = loss.clone().to(device="cuda")
+                    #current_actionsequence = actionsequence.clone().to(device="cuda")
+                    #current_best_blocks = blocks_choice.clone().to(device="cuda")
+                    current_action = po.to(device="cuda")
+                    current_best_block = current_block.to(device="cuda")
+                    current_block_choice = block_choice
+                    #current_hidden = new_hidden
 
-                    if loss.mean() < current_loss:
-                        current_loss = loss.mean().to(device="cuda")
-                        current_full_loss = loss.clone().to(device="cuda")
-                        #current_actionsequence = actionsequence.clone().to(device="cuda")
-                        #current_best_blocks = blocks_choice.clone().to(device="cuda")
-                        current_action = po.to(device="cuda")
-                        current_best_block = current_block.to(device="cuda")
-                        current_block_choice = block_choice
-                        #current_hidden = new_hidden
-
-                #all_blocks.remove(current_block_choice)
+            #all_blocks.remove(current_block_choice)
 
             #del actionsequence
             del block_choice
@@ -359,20 +328,39 @@ if clientID!=-1:
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
             new_position = current_action.view(n_positions)
-            new_block = current_best_block.view(n_blocks)
+            new_block = current_best_block.view(batch_sz, n_blocks).to(device="cuda")
+            actionnum = torch.narrow(new_position, 0, 0, 5).view(1, batch_sz, 5)
+            orientationnum = torch.narrow(new_position, 0, 8, 3).view(1, batch_sz, 3)
+
+            policy1 = torch.narrow(new_position, 0, 5, 3).view(1, batch_sz, 3)
+            policy2 = torch.narrow(new_position, 0, 11, 2).view(1, batch_sz, 2)
+
+            optimizer1 = torch.optim.Adam([policy1], lr=0.001)
+            optimizer2 = torch.optim.Adam([policy2], lr=0.001)
+
+            ai = AI.ActionInference(net, policy1, policy2, optimizer1, optimizer2, criterion=net.loss, attention = True)
+            # print(idx)
+            # print(target)
+
+            if idx == 0:
+                # current_block = blocks_target[idx].view(1, batch_sz, n_blocks).to(device="cuda")
+                action, _ = ai.action_inference(state.view(1, 1, block_sz), ai_target[-1].view(1, 1, block_sz + 3), new_block, actionnum, orientationnum, True,
+                                                current_block=current_best_block)
+            else:
+                action, _ = ai.action_inference(state.view(1, 1, block_sz), ai_target[-1].view(1, 1, block_sz + 3), new_block, actionnum, orientationnum, False)
+
+            action = action.view(n_positions)
 
             block_nr = int(torch.argmax(new_block))
-            pos = torch.narrow(new_position, 0, 0, 5)
-            leftright = torch.narrow(new_position, 0, 5, 1)
-            frontback = torch.narrow(new_position, 0, 6, 1)
-            ort = torch.narrow(new_position, 0, 8, 11)
-
-            print(net(state, new_block, new_position))
+            pos = torch.narrow(action, 0, 0, 5)
+            leftright = torch.narrow(action, 0, 5, 1)
+            frontback = torch.narrow(action, 0, 6, 1)
+            ort = torch.narrow(action, 0, 8, 5)
 
             sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
             op = shapeslist[block_nr].getPosition()
             shapeslist[block_nr].moveTo(2, 2, [])
-            shapeslist[block_nr].setVisualOrientation(ort)
+            shapeslist[block_nr].setVisualOrientation_simple(ort)
 
             shapeslist[block_nr].set_relative_position(pos, shapeslist[first_block], leftright, frontback, withoutAll[block_nr])
 
@@ -383,45 +371,39 @@ if clientID!=-1:
             for bl in range(0, n_blocks):
                 p_help = shapeslist[bl].getPosition()
                 p = shapeslist[bl].getRelativePosition(shapeslist[first_block], p_help, False)
-                o = shapeslist[bl].getOrientationType()
+                o = shapeslist[bl].getOrientationType_simple()
                 c = shapeslist[bl].getColor()
-                bb = shapeslist[bl].getBoundingBox()
+                bb = shapeslist[bl].getBoundingBox()[0]
                 t = shapeslist[bl].getType()
-
+                d = shapeslist[bl].getDistances(withoutAll[bl])
                 state = state.view(1, 1, block_sz)
 
                 state[0][0][bl * state_sz] = t
                 state[0][0][bl * state_sz + 1] = c[0]
                 state[0][0][bl * state_sz + 2] = c[1]
                 state[0][0][bl * state_sz + 3] = c[2]
-                state[0][0][bl * state_sz + 4] = bb[0]
-                state[0][0][bl * state_sz + 5] = bb[1]
-                state[0][0][bl * state_sz + 6] = bb[2]
-                state[0][0][bl * state_sz + 7] = p[0]
-                state[0][0][bl * state_sz + 8] = p[1]
-                state[0][0][bl * state_sz + 9] = p[2]
-                state[0][0][bl * state_sz + 10] = p[3]
-                state[0][0][bl * state_sz + 11] = p[4]
-                state[0][0][bl * state_sz + 12] = p[5]
-                state[0][0][bl * state_sz + 13] = p[6]
-                state[0][0][bl * state_sz + 14] = p[7]
-                state[0][0][bl * state_sz + 15] = o[0]
-                state[0][0][bl * state_sz + 16] = o[1]
-                state[0][0][bl * state_sz + 17] = o[2]
-                state[0][0][bl * state_sz + 18] = o[3]
-                state[0][0][bl * state_sz + 19] = o[4]
-                state[0][0][bl * state_sz + 20] = o[5]
-                state[0][0][bl * state_sz + 21] = o[6]
-                state[0][0][bl * state_sz + 22] = o[7]
-                state[0][0][bl * state_sz + 23] = o[8]
-                state[0][0][bl * state_sz + 24] = o[9]
-                state[0][0][bl * state_sz + 25] = o[10]
+                state[0][0][bl * state_sz + 4] = bb
+                state[0][0][bl * state_sz + 5] = p[0]
+                state[0][0][bl * state_sz + 6] = p[1]
+                state[0][0][bl * state_sz + 7] = p[2]
+                state[0][0][bl * state_sz + 8] = p[3]
+                state[0][0][bl * state_sz + 9] = p[4]
+                state[0][0][bl * state_sz + 10] = p[5]
+                state[0][0][bl * state_sz + 11] = p[6]
+                state[0][0][bl * state_sz + 12] = p[7]
+                state[0][0][bl * state_sz + 13] = o[0]
+                state[0][0][bl * state_sz + 14] = o[1]
+                state[0][0][bl * state_sz + 15] = o[2]
+                state[0][0][bl * state_sz + 16] = o[3]
+                state[0][0][bl * state_sz + 17] = o[4]
+                state[0][0][bl * state_sz + 18] = d[0]
+                state[0][0][bl * state_sz + 19] = d[1]
 
                 state = state.view(1, n_blocks, n_single_state)
 
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
             loss = net.loss(state.view(batch_sz, block_sz), target[seq_len].view(batch_sz, block_sz))
-        print(loss)
+        #print(loss)
         print(loss.mean())
         #print("state: " + str(state[0]))
         #print("target: " + str(target[0]))
@@ -438,7 +420,7 @@ if clientID!=-1:
 
         arrangement.append(list(timestep))
 
-        with open("ai3_result" + str(i_batch * batch_sz + b) + ".json", 'w') as f:
+        with open("ai3_result_attention" + str(i_batch * batch_sz + b) + ".json", 'w') as f:
             json.dump(list(arrangement), f, indent=2)
 
         for i in range(len(shapeslist)):
@@ -446,8 +428,8 @@ if clientID!=-1:
             shapeslist[i].scaleShape(reshape[i][0], reshape[i][1], reshape[i][2])
             shapeslist[i].turnOriginalWayUp()
 
-        for i in range(len(allshapes)):
-            allshapes[i].setPosition_eval([i*0.7-4, 3, allshapes[i].getPosition()[2]*2], [])
+        for i in range(len(shapeslist)):
+            shapeslist[i].setPosition_eval([i*0.7-4, 3, shapeslist[i].getPosition()[2]*2], [])
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
         del shapeslist

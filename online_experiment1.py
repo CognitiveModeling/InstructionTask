@@ -42,6 +42,26 @@ max_s = 2
 max_co = 2
 max_py = 2
 
+black = (20 / 255, 20 / 255, 20 / 255)
+white = (248 / 255, 248 / 255, 248 / 255)
+red = (181 / 255, 37 / 255, 38 / 255)
+green = (0 / 255, 148 / 255, 60 / 255)
+yellow = (254 / 255, 182 / 255, 0 / 255)
+blue = (8 / 255, 145 / 255, 187 / 255)
+brown = (77 / 255, 38 / 255, 30 / 255)
+purple = (105 / 255, 52 / 255, 117 / 255)
+pink = (234 / 255, 152 / 255, 183 / 255)
+orange = (220 / 255, 65 / 255, 2 / 255)
+gray = (128 / 255, 128 / 255, 128 / 255)
+blueish = (28 / 255, 171 / 255, 174 / 255)
+greenish = (178 / 255, 179 / 255, 0)
+reddish = (132 / 255, 32 / 255, 57 / 255)
+yellowish = (234 / 255, 151 / 255, 0)
+brownish = (111 / 255, 88 / 255, 21 / 255)
+
+colors_prot = [black, white, red, green, yellow, blue, brown, purple, pink, orange, gray]
+colors_nonprot = [blueish, greenish, reddish, yellowish, brownish]
+
 if clientID!=-1:
     print ('Connected to remote API server')
 
@@ -107,8 +127,6 @@ if clientID!=-1:
     np.random.shuffle(order)
     sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
-
-
     #shapeslist[0].setOrientation([o1, o2, o3, o4, o5, o6])
     #rotation = shapeslist[0].rotationfromWorldAxis(alpha, beta, gamma)
     #shapeslist[0].setradianOrientation(rotation)
@@ -118,13 +136,13 @@ if clientID!=-1:
     #shapeslist[1].setColor(0, 0, 1)
     #shapeslist[2].moveRightOf(shapeslist[0], withoutAll[2])
 
-    for i in range(221, 276):
+    for i in range(401, 501):
         print(i)
 
         for shape in shapeslist:
             # shape.moveTo(shape.getPosition()[0], 0)
 
-            x = random.uniform(0.1, 1.)
+            x = random.uniform(0.2, 1.)
             y = x
             z = x
 
@@ -135,60 +153,12 @@ if clientID!=-1:
             rshape = [xb, yb, zb]
             reshape.append(rshape)
 
-            black1 = (0 / 255, 0 / 255, 0 / 255)
-            black2 = (10 / 255, 10 / 255, 10 / 255)
-            black3 = (25 / 255, 25 / 255, 25 / 255)
-            black = [black1, black2, black3]
+            color_type = random.choice([0, 0, 1, 1, 1])
 
-            white1 = (255 / 255, 255 / 255, 255 / 255)
-            white2 = (248 / 255, 248 / 255, 248 / 255)
-            white3 = (250 / 255, 250 / 255, 250 / 255)
-            white = [white1, white2, white3]
-
-            red1 = (181 / 255, 37 / 255, 38 / 255)
-            red2 = (141 / 255, 11 / 255, 24 / 255)
-            red = [red1, red2]
-
-            green1 = (0 / 255, 148 / 255, 60 / 255)
-            green2 = (0 / 255, 116 / 255, 65 / 255)
-            green = [green1, green2]
-
-            yellow1 = (254 / 255, 182 / 255, 0 / 255)
-            yellow = [yellow1]
-
-            blue1 = (26 / 255, 143 / 255, 174 / 255)
-            blue2 = (8 / 255, 145 / 255, 187 / 255)
-            blue3 = (12 / 255, 143 / 255, 283 / 255)
-            blue4 = (2 / 255, 114 / 255, 147 / 255)
-            blue5 = (11 / 255, 113 / 255, 144 / 255)
-            blue6 = (4 / 255, 113 / 255, 164 / 255)
-            blue = [blue1, blue2, blue3, blue4, blue5, blue6]
-
-            brown1 = (77 / 255, 38 / 255, 30 / 255)
-            brown2 = (72 / 255, 38 / 255, 24 / 255)
-            brown3 = (69 / 255, 40 / 255, 22 / 255)
-            brown = [brown1, brown2, brown3]
-
-            purple1 = (66 / 255, 38 / 255, 75 / 255)
-            purple2 = (105 / 255, 52 / 255, 117 / 255)
-            purple = [purple1, purple2]
-
-            pink1 = (234 / 255, 152 / 255, 183 / 255)
-            pink2 = (209 / 255, 124 / 255, 158 / 255)
-            pink = [pink1, pink2]
-
-            orange1 = (220 / 255, 65 / 255, 2 / 255)
-            orange = [orange1]
-
-            gray1 = (128 / 255, 128 / 255, 128 / 255)
-            gray2 = (110 / 255, 110 / 255, 110 / 255)
-            gray3 = (145 / 255, 145 / 255, 145 / 255)
-            gray = [gray1, gray2, gray3]
-
-            focal_colors = [black, white, red, green, yellow, blue, brown, purple, pink, orange, gray]
-
-            color = random.choice(focal_colors)
-            rgb = random.choice(color)
+            if color_type == 1:
+                rgb = random.choice(colors_prot)
+            else:
+                rgb = random.choice(colors_nonprot)
 
             r, g, b1 = rgb
 
@@ -206,28 +176,52 @@ if clientID!=-1:
             sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
             values = {
-                "bounding box": shape.getBoundingBox(),
+                "size": shape.getBoundingBox()[0],
                 "r": r,
                 "g": g,
                 "b": b1,
                 "type": shape.getType(),
-                "id": i
+                "id": i,
+                "color_type": color_type
             }
 
             a = 0.
             b = 0.
-            time.sleep(1)
+            '''
+            orientation_type = [0, 0, 0]
+            facing_choices = [0, 0]
+
+            type = [0, 0, 0, 0, 0, 1, 1, 1, 2]
+            type_choice = np.random.choice(type)
+
+            orientation_type[type_choice] = 1
+
+            if type_choice == 0:
+                facing_choices[0] = np.random.uniform(- 1, 1)
+            elif type_choice == 1:
+                facing_choices[0] = np.random.uniform(- 1, 1)
+                facing_choices[1] = np.random.choice([0, 1])
+
+            shape.setVisualOrientation_simple(
+                [orientation_type[0], orientation_type[1], orientation_type[2], facing_choices[0], facing_choices[1]])
+            #print([orientation_type[0], orientation_type[1], orientation_type[2], facing_choices[0], facing_choices[1]])
+            '''
+
+            #time.sleep(1)
 
             shape.moveTo(a, b, [])
 
+            #print(shape.getOrientationType_simple())
+
+            #'''
             with open('attribute_files.csv', mode='a') as csv_file:
-                fieldnames = ['id', 'type', 'bounding box', 'r', 'g', 'b']
+                fieldnames = ['id', 'type', 'size', 'r', 'g', 'b', 'color_type']
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
                 if i == 1:
                     writer.writeheader()
                 writer.writerow(values)
-
+            #'''
         input()
 
         for i in range(len(shapeslist)):
