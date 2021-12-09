@@ -17,9 +17,11 @@ class Net(nn.Module):
         self.n_blocknr = 1
         self.n_boundingbox = 1
         self.n_type = 1
+        self.n_status = 1
         self.vector_dim = vector_dim
         self.confidence_mid_dim = 10
-        self.single_state = self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation + self.n_distances
+        self.single_state = self.n_type + self.n_color + self.n_boundingbox + self.n_position + self.n_orientation + \
+                            self.n_distances + self.n_status
         self.n_state = self.n_blocks * self.single_state
         self.batch_sz = batch_sz
         self.values = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
@@ -177,25 +179,39 @@ class Net(nn.Module):
 
     def loss(self, output, target, blocks=None, test=False, added=False):
         if test:
+            #remove duplicates
+            blocks = list(dict.fromkeys(blocks))
+
             n = len(blocks)
             blocks.sort()
             if added:
-                new_output = torch.zeros([1, n * self.single_state + 3])
-                new_target = torch.zeros([1, n * self.single_state + 3])
+                new_output = torch.zeros([1, n * (self.single_state - 1) + 6]).to(device="cuda")
+                new_target = torch.zeros([1, n * (self.single_state - 1) + 6]).to(device="cuda")
                 for b in range(n):
-                    for i in range(self.single_state):
-                        new_output[0, b * self.single_state + i] = output[0, blocks[b] * self.single_state + i]
-                        new_target[0, b * self.single_state + i] = target[0, blocks[b] * self.single_state + i]
+                    for i in range(1, self.single_state):
+                        new_output[0, b * self.single_state + i - 1] = output[0, blocks[b] * self.single_state + i]
+                        new_target[0, b * self.single_state + i - 1] = target[0, blocks[b] * self.single_state + i]
                     for j in range(3):
-                        new_output[0, n * self.single_state + j] = output[0, self.n_state + j]
-                        new_target[0, n * self.single_state + j] = target[0, self.n_state + j]
+                        new_output[0, n * (self.single_state - 1) + j + 3] = output[0, self.n_state + j]
+                        new_target[0, n * (self.single_state - 1) + j + 3] = target[0, self.n_state + j]
+                        new_target[0, n * (self.single_state - 1) + j] = target[0, j * self.single_state]
+                        new_output[0, n * (self.single_state - 1) + j] = output[0, j * self.single_state]
+                    #print(blocks)
+                    #print(target)
+                    #print(new_target)
+                    #print(output)
+                    #print(new_output)
+
             else:
-                new_output = torch.zeros([1, n * self.single_state])
-                new_target = torch.zeros([1, n * self.single_state])
+                new_output = torch.zeros([1, n * (self.single_state - 1) + 3]).to(device="cuda")
+                new_target = torch.zeros([1, n * (self.single_state - 1) + 3]).to(device="cuda")
                 for b in range(n):
-                    for i in range(self.single_state):
-                        new_output[0, b * self.single_state + i] = output[0, blocks[b] * self.single_state + i]
-                        new_target[0, b * self.single_state + i] = target[0, blocks[b] * self.single_state + i]
+                    for i in range(1, self.single_state):
+                        new_output[0, b * self.single_state + i - 1] = output[0, blocks[b] * self.single_state + i]
+                        new_target[0, b * self.single_state + i - 1] = target[0, blocks[b] * self.single_state + i]
+                    for j in range(3):
+                        new_target[0, n * (self.single_state - 1) + j] = target[0, j * self.single_state]
+                        new_output[0, n * (self.single_state - 1) + j] = output[0, j * self.single_state]
 
             target = new_target
             output = new_output

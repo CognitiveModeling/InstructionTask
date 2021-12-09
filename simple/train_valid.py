@@ -44,6 +44,7 @@ batch_sz = 100
 n_actions = 5
 n_agents = 3
 n_states = n_actions + 1
+n_status = 1
 n_size = 1
 n_color = 3
 n_type = 1
@@ -51,7 +52,7 @@ n_positions = 3
 n_orientations = 6
 n_distances = 2
 action_size = n_positions + n_orientations
-n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color
+n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color + n_status
 block_sz = n_agents * n_single_state
 
 net = attention_net.Net(batch_sz, n_agents, n_actions, vector_dim=128).to(device="cuda")
@@ -139,7 +140,7 @@ if clientID != -1:
         n_orientations = 6
         n_distances = 2
         action_size = n_positions + n_orientations
-        n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color
+        n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color + n_status
         block_sz = n_agents * n_single_state
 
         random.shuffle(samples_list)
@@ -248,7 +249,7 @@ if clientID != -1:
 
         print(str(epoch) + " training loss: " + str(mean_loss.item()) + " validation loss: " + str(mean_validation_loss.item()))
 
-        PATH = "state_dict_model_validation_2400samples_attention_net_128_conf10_3_001.pt"
+        PATH = "state_dict_model_validation_3100samples_attention_net_128_conf10_3_001.pt"
 
         # Save
         torch.save(net.state_dict(), PATH)
@@ -280,7 +281,7 @@ if clientID != -1:
             n_positions = n_position + n_orientations
             n_distances = 2
             action_size = n_positions + n_orientations
-            n_single_state = n_positions + n_distances + n_size + n_type + n_color
+            n_single_state = n_positions + n_distances + n_size + n_type + n_color + n_status
             block_sz = n_single_state * n_blocks
             state_sz = n_single_state
             blocks_in_game = []
@@ -292,6 +293,8 @@ if clientID != -1:
                 cu = 0
                 cy = 0
                 s = 0
+
+                blocks_in_game = []
 
                 reshape = []
                 arrangement = []
@@ -315,13 +318,13 @@ if clientID != -1:
                 ai_target = create_base_target_state(target)
 
                 for i in range(n_blocks):
-                    if test_states[test_seq_len, i_batch, 0, i * state_sz] == 0:
+                    if test_states[test_seq_len, i_batch, 0, 1 + i * state_sz] == 0:
                         shapeslist.append(shapes.Shape(clientID, "Cuboid", cu))
                         cu += 1
-                    if test_states[test_seq_len, i_batch, 0, i * state_sz] == 1:
+                    if test_states[test_seq_len, i_batch, 0, 1 + i * state_sz] == 1:
                         shapeslist.append(shapes.Shape(clientID, "Cylinder", cy))
                         cy += 1
-                    if test_states[test_seq_len, i_batch, 0, i * state_sz] == 2:
+                    if test_states[test_seq_len, i_batch, 0, 1 + i * state_sz] == 2:
                         shapeslist.append(shapes.Shape(clientID, "Sphere", s))
                         s += 1
 
@@ -337,7 +340,7 @@ if clientID != -1:
 
                     shape = shapeslist[i_shape]
 
-                    x = test_states[0, i_batch, 0, i_shape * state_sz + 4] * 2
+                    x = test_states[0, i_batch, 0, i_shape * state_sz + 5] * 2
                     y = x
                     z = x
 
@@ -351,9 +354,9 @@ if clientID != -1:
                     sample_input = []
                     sample_target = []
 
-                    r = test_states[0, i_batch, 0, i_shape * state_sz + 1]
-                    g = test_states[0, i_batch, 0, i_shape * state_sz + 2]
-                    b1 = test_states[0, i_batch, 0, i_shape * state_sz + 3]
+                    r = test_states[0, i_batch, 0, i_shape * state_sz + 2]
+                    g = test_states[0, i_batch, 0, i_shape * state_sz + 3]
+                    b1 = test_states[0, i_batch, 0, i_shape * state_sz + 4]
 
                     fx = np.random.uniform(-1.5, 1.5)
                     fy = np.random.uniform(-1.5, 1.5)
@@ -375,6 +378,10 @@ if clientID != -1:
                     if idx != 0:
                         for bl in range(0, n_blocks):
                             p_help = shapeslist[bl].getPosition()
+                            if shapeslist[bl].outOfBounds(p_help):
+                                status = 0
+                            else:
+                                status = 1
                             p = shapeslist[bl].get_relative_position_simple(shapeslist[first_block], p_help, False)
                             o = shapeslist[bl].getOrientationType_simple()
                             c = shapeslist[bl].getColor()
@@ -383,22 +390,23 @@ if clientID != -1:
                             d = shapeslist[bl].getDistances(withoutAll[bl])
                             state = state.view(1, 1, block_sz)
 
-                            state[0][0][bl * state_sz] = t
-                            state[0][0][bl * state_sz + 1] = c[0]
-                            state[0][0][bl * state_sz + 2] = c[1]
-                            state[0][0][bl * state_sz + 3] = c[2]
-                            state[0][0][bl * state_sz + 4] = bb
-                            state[0][0][bl * state_sz + 5] = p[0]
-                            state[0][0][bl * state_sz + 6] = p[1]
-                            state[0][0][bl * state_sz + 7] = p[2]
-                            state[0][0][bl * state_sz + 8] = o[0]
-                            state[0][0][bl * state_sz + 9] = o[1]
-                            state[0][0][bl * state_sz + 10] = o[2]
-                            state[0][0][bl * state_sz + 11] = o[3]
-                            state[0][0][bl * state_sz + 12] = o[4]
-                            state[0][0][bl * state_sz + 13] = o[5]
-                            state[0][0][bl * state_sz + 14] = d[0]
-                            state[0][0][bl * state_sz + 15] = d[1]
+                            state[0][0][bl * state_sz] = status
+                            state[0][0][bl * state_sz + 1] = t
+                            state[0][0][bl * state_sz + 2] = c[0]
+                            state[0][0][bl * state_sz + 3] = c[1]
+                            state[0][0][bl * state_sz + 4] = c[2]
+                            state[0][0][bl * state_sz + 5] = bb
+                            state[0][0][bl * state_sz + 6] = p[0]
+                            state[0][0][bl * state_sz + 7] = p[1]
+                            state[0][0][bl * state_sz + 8] = p[2]
+                            state[0][0][bl * state_sz + 9] = o[0]
+                            state[0][0][bl * state_sz + 10] = o[1]
+                            state[0][0][bl * state_sz + 11] = o[2]
+                            state[0][0][bl * state_sz + 12] = o[3]
+                            state[0][0][bl * state_sz + 13] = o[4]
+                            state[0][0][bl * state_sz + 14] = o[5]
+                            state[0][0][bl * state_sz + 15] = d[0]
+                            state[0][0][bl * state_sz + 16] = d[1]
 
                             state = state.to(device="cuda")
 
@@ -540,12 +548,12 @@ if clientID != -1:
                                                         testing=True)
 
                     action = action.view(n_positions)
-
                     prediction = net(state.view(1, n_blocks, n_single_state), new_block.view(1, n_blocks),
                                      action.view(1, n_positions), testing=True)
 
                     block_nr = int(torch.argmax(new_block))
                     blocks_in_game.append(block_nr)
+                    current_blocks_in_game = blocks_in_game.copy()
                     pos = torch.narrow(action, 0, 0, 3)
                     ort = torch.narrow(action, 0, 3, 6)
 
@@ -562,6 +570,10 @@ if clientID != -1:
 
                     for bl in range(0, n_blocks):
                         p_help = shapeslist[bl].getPosition()
+                        if shapeslist[bl].outOfBounds(p_help):
+                            status = 0
+                        else:
+                            status = 1
                         p = shapeslist[bl].get_relative_position_simple(shapeslist[first_block], p_help, False)
                         o = shapeslist[bl].getOrientationType_simple()
                         c = shapeslist[bl].getColor()
@@ -570,22 +582,23 @@ if clientID != -1:
                         d = shapeslist[bl].getDistances(withoutAll[bl])
                         state = state.view(1, 1, block_sz)
 
-                        state[0][0][bl * state_sz] = t
-                        state[0][0][bl * state_sz + 1] = c[0]
-                        state[0][0][bl * state_sz + 2] = c[1]
-                        state[0][0][bl * state_sz + 3] = c[2]
-                        state[0][0][bl * state_sz + 4] = bb
-                        state[0][0][bl * state_sz + 5] = p[0]
-                        state[0][0][bl * state_sz + 6] = p[1]
-                        state[0][0][bl * state_sz + 7] = p[2]
-                        state[0][0][bl * state_sz + 8] = o[0]
-                        state[0][0][bl * state_sz + 9] = o[1]
-                        state[0][0][bl * state_sz + 10] = o[2]
-                        state[0][0][bl * state_sz + 11] = o[3]
-                        state[0][0][bl * state_sz + 12] = o[4]
-                        state[0][0][bl * state_sz + 13] = o[5]
-                        state[0][0][bl * state_sz + 14] = d[0]
-                        state[0][0][bl * state_sz + 15] = d[1]
+                        state[0][0][bl * state_sz] = status
+                        state[0][0][bl * state_sz + 1] = t
+                        state[0][0][bl * state_sz + 2] = c[0]
+                        state[0][0][bl * state_sz + 3] = c[1]
+                        state[0][0][bl * state_sz + 4] = c[2]
+                        state[0][0][bl * state_sz + 5] = bb
+                        state[0][0][bl * state_sz + 6] = p[0]
+                        state[0][0][bl * state_sz + 7] = p[1]
+                        state[0][0][bl * state_sz + 8] = p[2]
+                        state[0][0][bl * state_sz + 9] = o[0]
+                        state[0][0][bl * state_sz + 10] = o[1]
+                        state[0][0][bl * state_sz + 11] = o[2]
+                        state[0][0][bl * state_sz + 12] = o[3]
+                        state[0][0][bl * state_sz + 13] = o[4]
+                        state[0][0][bl * state_sz + 14] = o[5]
+                        state[0][0][bl * state_sz + 15] = d[0]
+                        state[0][0][bl * state_sz + 16] = d[1]
 
                         state = state.view(1, n_blocks, n_single_state)
 
@@ -623,7 +636,7 @@ if clientID != -1:
             'execloss': mean_test_loss.item()
         }
 
-        with open('training_progression_0.001_10_128.csv', mode='a') as csv_file:
+        with open('training_progression_3100_0.001_10_128.csv', mode='a') as csv_file:
             fieldnames = ['epoch', 'trainloss', 'validloss', 'predloss', 'execloss']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 

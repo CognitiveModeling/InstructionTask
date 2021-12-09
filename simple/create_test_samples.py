@@ -49,8 +49,11 @@ for i in r:
             helper = []
             #for item in reference:
             #    helper.append(item)
-
             for l in range(n_agents):
+                if data[j][l][3][2] == -1:
+                    helper.append(0)
+                else:
+                    helper.append(1)
                 helper.append(data[j][l][0])
                 for m in range(5):
                     if m+1 == 3:
@@ -122,6 +125,10 @@ for i in r:
         #for item in reference:
         #    helper.append(item)
         for l in range(n_agents):
+            if data[n_actions][l][3][2] == -1:
+                helper.append(0)
+            else:
+                helper.append(1)
             helper.append(data[n_actions][l][0])
             #if data[n_actions][l][3][2] < 0 or math.isnan(data[j][l][4][2]):
             #    problematic = True

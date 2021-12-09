@@ -56,10 +56,11 @@ class ActionInference():
         n_size = 1
         n_color = 3
         n_type = 1
+        n_status = 1
         n_positions = 3
         n_orientations = 6
         n_distances = 2
-        n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color
+        n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color + n_status
         self.block_sz = n_agents * n_single_state
 
     def reset_policies(self, p3, p5):

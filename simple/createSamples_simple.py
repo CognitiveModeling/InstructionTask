@@ -15,7 +15,7 @@ def same_position(po1, po2):
            po1[2] - 0.1 <= po2[2] <= po1[2] + 0.1
 
 
-r = list(range(0, 2400))
+r = list(range(0, 3100))
 #random.shuffle(r)
 
 n_agents = 3
@@ -51,6 +51,10 @@ for i in r:
             #    helper.append(item)
 
             for l in range(n_agents):
+                if data[j][l][3][2] == -1:
+                    helper.append(0)
+                else:
+                    helper.append(1)
                 helper.append(data[j][l][0])
                 for m in range(5):
                     if m+1 == 3:
@@ -125,6 +129,10 @@ for i in r:
         #for item in reference:
         #    helper.append(item)
         for l in range(n_agents):
+            if data[n_actions][l][3][2] == -1:
+                helper.append(0)
+            else:
+                helper.append(1)
             helper.append(data[n_actions][l][0])
             #if data[n_actions][l][3][2] < 0 or math.isnan(data[j][l][4][2]):
             #    problematic = True

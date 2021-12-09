@@ -80,7 +80,7 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(2624, 10000))
+    even_list = list(range(2995, 10000))
 
     for j in even_list:
         print(j)
@@ -266,9 +266,9 @@ if clientID!=-1:
                 arrangement.append(list(timestep))
 
             else:
-                leftright = np.random.uniform(-0.2, 0.2)
-                frontback = np.random.uniform(-0.2, 0.2)
-                up = np.random.uniform(0, 0.7)
+                leftright = np.random.uniform(-0.4, 0.4)
+                frontback = np.random.uniform(-0.4, 0.4)
+                up = np.random.uniform(0, 0.1)
                 shapeslist[order[a-1]].moveTo(2, 2, [])
                 shapeslist[order[a-1]].setVisualOrientation_simple([orientation_type[0], orientation_type[1],
                                                                     orientation_type[2], facing_choices[0],
@@ -279,11 +279,12 @@ if clientID!=-1:
                 #orientation = list([o1, o2, o3, o4, o5, o6])
                 #orientation = shapeslist[order[a-1]].getOrientationType()
                 action = j % 5
-                position = shapeslist[order[a - 1]].perform_random_simple_action(shapeslist[first_block],
-                                                                                 action, leftright, frontback, up,
-                                                                                 withoutAll[order[a - 1]])
-                #position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], actionChoices[a],
-                #                                                              leftright, frontback, up, withoutAll[order[a-1]])
+                #position = shapeslist[order[a - 1]].perform_random_simple_action(shapeslist[first_block],
+                #                                                                 action, leftright, frontback, up,
+                #                                                                 withoutAll[order[a - 1]])
+                position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], actionChoices[a],
+                                                                              leftright, frontback, up,
+                                                                               withoutAll[order[a-1]])
 
                 #print(shapeslist[order[a-1]])
                 #print(withoutAll[order[a-1]])
