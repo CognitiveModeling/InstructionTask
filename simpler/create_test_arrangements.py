@@ -19,7 +19,7 @@ import mathown
 import math
 
 n_blocks = 3
-n_actions = n_blocks + 2
+n_actions = n_blocks
 max_cu = 5
 max_cy = 0
 max_s = 0
@@ -80,7 +80,7 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(4405, 10000))
+    even_list = list(range(0, 10))
 
     for j in even_list:
         print(j)
@@ -127,16 +127,17 @@ if clientID!=-1:
         arrangement = []
 
         old_order = list(range(n_blocks))
-        np.random.shuffle(old_order)
+        #np.random.shuffle(old_order)
 
         first_block = old_order[0]
         old_order.remove(first_block)
+        order = old_order
 
-        add1 = np.random.choice(old_order)
-        add2 = np.random.choice(old_order)
+        #add1 = np.random.choice(old_order)
+        #add2 = np.random.choice(old_order)
 
-        order = list([old_order[0], old_order[1], add1, add2])
-        np.random.shuffle(order)
+        #order = list([old_order[0], old_order[1], add1, add2])
+        #np.random.shuffle(order)
 
         #print(first_block)
         #print(order)
@@ -208,27 +209,20 @@ if clientID!=-1:
 
             orientation_type = [0, 0, 0]
 
-            type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
-            type_choice = np.random.choice(type)
+            #type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
+            #type_choice = np.random.choice(type)
+            type_choice = 0
 
             orientation_type[type_choice] = 1
 
             facing_choices = [0, 0, 0]
             facing = [1, 0]
 
-            if type_choice == 0:
-                facing_choices[0] = np.random.uniform(- 1, 1)
-                facing_choices[1] = math.sin(math.acos(facing_choices[0]))
-                if random.randint(0, 1) == 0:
-                    facing_choices[1] = -facing_choices[1]
-            elif type_choice == 1:
-                facing_choices[0] = np.random.uniform(- 1, 1)
-                facing_choices[1] = math.sin(math.acos(facing_choices[0]))
-                if random.randint(0, 1) == 0:
-                    facing_choices[1] = -facing_choices[1]
-                facing = [0, 1]
-                facing_choice = random.choice(facing)
-                facing_choices[2] = facing_choice
+            facing_choices[0] = np.random.uniform(- 1, 1)
+            facing_choices[1] = math.sin(math.acos(facing_choices[0]))
+            if random.randint(0, 1) == 0:
+                facing_choices[1] = -facing_choices[1]
+
 
 
             if a == 0:
@@ -266,9 +260,9 @@ if clientID!=-1:
                 arrangement.append(list(timestep))
 
             else:
-                leftright = np.random.uniform(-0.4, 0.4)
-                frontback = np.random.uniform(-0.4, 0.4)
-                up = np.random.uniform(0.0, 1.0)
+                leftright = np.random.uniform(-0.1, 0.1)
+                frontback = np.random.uniform(-0.1, 0.1)
+                up = np.random.uniform(0, 0.1)
                 shapeslist[order[a-1]].moveTo(2, 2, [])
                 shapeslist[order[a-1]].setVisualOrientation_simple([orientation_type[0], orientation_type[1],
                                                                     orientation_type[2], facing_choices[0],
@@ -279,12 +273,8 @@ if clientID!=-1:
                 #orientation = list([o1, o2, o3, o4, o5, o6])
                 #orientation = shapeslist[order[a-1]].getOrientationType()
                 action = j % 5
-                #position = shapeslist[order[a - 1]].perform_random_simple_action(shapeslist[first_block],
-                #                                                                 action, leftright, frontback, up,
-                #                                                                 withoutAll[order[a - 1]])
-                position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], actionChoices[a],
-                                                                              leftright, frontback, up,
-                                                                               withoutAll[order[a-1]])
+                position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], action,
+                                                                              leftright, frontback, up, withoutAll[order[a-1]])
 
                 #print(shapeslist[order[a-1]])
                 #print(withoutAll[order[a-1]])
@@ -330,7 +320,7 @@ if clientID!=-1:
 
         arrangement.append(list(timestep))
 
-        with open("../arrangements/arrangement" + str(j) + ".json", 'w') as f:
+        with open("../test_arrangements/arrangement" + str(j) + ".json", 'w') as f:
             json.dump(list(arrangement), f, indent=2)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
