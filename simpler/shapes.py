@@ -4,7 +4,6 @@ import sim
 from scipy.spatial.transform import Rotation as R
 import mathown
 import math
-import preferences
 import csv
 import numpy as np
 import d3g
@@ -689,6 +688,25 @@ class Shape:
                 print("error: no positional relation")
                 return [-1, -1, -1, -1, -1, -1, -1, -1]
 
+    def get_relative_position_old(self, object, position, first):
+        if first:
+            return [0, 0, -1]
+
+        op = object.getPosition()
+        sbb = self.getBoundingBoxWorld()
+
+        if self.sameObject(op, position):
+            return [0, 0, 0]
+        if self.tooFarAway(op, position):
+            return [0, 0, -1]
+
+        p = [0, 0, 0]
+        p[0] = position[0] - op[0]
+        p[1] = position[1] - op[1]
+        p[2] = position[2] - sbb[2] * 0.5
+
+        return p
+
     def get_relative_position_simple(self, object, position, first, shapelist):
         if first:
             return [0, 0, -1, -1]
@@ -733,6 +751,20 @@ class Shape:
 
         return p
 
+    def set_relative_position_simple_alt(self, position, object, shapelist):
+        op = object.getPosition()
+        p = [0, 0, self.getBoundingBoxWorld()[2] * 0.5]
+        if self.sameObject(op, self.getPosition()):
+            self.setPosition(p, shapelist)
+        else:
+            p[0] = position[0] + op[0]
+            p[1] = position[1] + op[1]
+            p[2] = position[2] + self.getBoundingBoxWorld()[2] * 0.5
+
+            p = self.setPosition_alt(p, shapelist)
+
+        return p
+
     def perform_random_simple_action(self, object, number, leftright, frontback, up, shapeslist):
         sbb = self.getBoundingBoxWorld()
         obb = object.getBoundingBoxWorld()
@@ -749,10 +781,33 @@ class Shape:
             position = self.set_relative_position_simple([leftright, 0.5 + frontback, up],
                                                          object, shapeslist)
         else:
-            position = self.set_relative_position_simple([leftright, frontback, obb[2]],
+            position = self.set_relative_position_simple([leftright, frontback, obb[2] + up],
                                                          object, shapeslist)
 
-        position = self.get_relative_position_simple(object, position, False)
+        position = self.get_relative_position_old(object, position, False)
+
+        return position
+
+    def perform_random_simple_action_alt(self, object, number, leftright, frontback, up, shapeslist):
+        sbb = self.getBoundingBoxWorld()
+        obb = object.getBoundingBoxWorld()
+        if number == 0:
+            position = self.set_relative_position_simple_alt([0.5 + leftright, frontback, up],
+                                                         object, shapeslist)
+        elif number == 1:
+            position = self.set_relative_position_simple_alt([- 0.5 + leftright, frontback, up],
+                                                         object, shapeslist)
+        elif number == 2:
+            position = self.set_relative_position_simple_alt([leftright, - 0.5 + frontback, up],
+                                                         object, shapeslist)
+        elif number == 3:
+            position = self.set_relative_position_simple_alt([leftright, 0.5 + frontback, up],
+                                                         object, shapeslist)
+        else:
+            position = self.set_relative_position_simple_alt([leftright, frontback, obb[2] + up],
+                                                         object, shapeslist)
+
+        position = self.get_relative_position_old(object, position, False)
 
         return position
 
@@ -778,28 +833,36 @@ class Shape:
         collision, shape = self.collision(position, shapelist, bb)
         belowGround = self.below_ground(position, bb)
         outOfBounds = self.outOfBounds(position)
+        res_position = position.copy()
+        if outOfBounds:
+            print("out of bounds")
+        elif collision:
+            print("collision")
+            res_position = [-3.5, 3.5, 1]
+        elif belowGround:
+            print("below ground")
+            res_position = [-3.5, 3.5, 1]
+
+        returnCode = sim.simxSetObjectPosition(self.clientID, self.handle, -1, res_position, sim.simx_opmode_blocking)
+
+        return position
+
+    def setPosition_alt(self, position, shapelist):
+        bb = self.getBoundingBoxWorld()
+        #inSpaceOf, shape = self.inSpaceOf(position, shapelist, bb)
+        collision, shape = self.collision(position, shapelist, bb)
+        belowGround = self.below_ground(position, bb)
+        outOfBounds = self.outOfBounds(position)
         while collision or belowGround or outOfBounds:
         #while belowGround or outOfBounds:
             if outOfBounds:
                 print("out of bounds")
-                print(position)
-                if position[0] < -2.5:
-                    position[0] = -2.4
-                elif position[0] > 2.5:
-                    position[0] = 2.4
-                elif position[1] < -2.5:
-                    position[1] = -2.4
-                elif position[1] > 2.5:
-                    position[1] = 2.4
             if collision:
                 print("collision")
-                print(position)
-                sbb = shape.getBoundingBoxWorld()
-                position = [position[0], position[1], position[2] + sbb[2]]
+                #sbb = shape.getBoundingBoxWorld()
+                position = [position[0], position[1], position[2] + 0.1]
             if belowGround:
                 print("below ground")
-                print(position)
-                print(bb)
                 position = [position[0], position[1], bb[2]*0.5]
 
             collision, shape = self.inSpaceOf(position, shapelist, bb)
