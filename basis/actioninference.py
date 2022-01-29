@@ -58,11 +58,11 @@ class ActionInference():
         n_type = 1
         n_status = 1
         n_positions = 3
-        n_positions_state = 4
+        n_positions_state = 6
         n_orientations = 6
         n_distances = 2
-        #n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color + n_status
-        n_single_state = n_type + n_color + n_size + n_positions_state + n_orientations + n_status
+        # n_single_state = n_positions + n_orientations + n_distances + n_size + n_type + n_color + n_status
+        n_single_state = n_color + n_size + n_positions_state + n_orientations + n_status
         self.block_sz = n_agents * n_single_state
 
     def reset_policies(self, p3, p5):
@@ -75,45 +75,6 @@ class ActionInference():
             pol5[0, 0, j] = 0.0
         return pol3, pol5
 
-
-    def recreate_onehot(self, block):
-        blocks = block[0].clone()
-        one = torch.argmax(blocks[0])
-        u = blocks[0]
-
-        for guess in range(0, len(blocks[0])):
-            u[guess] = 0.0
-
-        u[one] = 1.0
-
-        blocks[0] = u
-
-        return blocks.unsqueeze(0)
-
-    def recreate_action(self, p2, p3, p4, p5, first_block):
-        pol2 = p2.clone()
-        pol3 = p3.clone()
-        pol4 = p4.clone()
-        pol5 = p5.clone()
-
-        pos_one = torch.argmax(pol2[0][0])
-
-        ort_one = torch.argmax(pol4[0][0])
-
-        for guess in range(0, len(pol2[0][0])):
-            pol2[0, 0, guess] = 0.0
-
-        for guess in range(0, len(pol4[0][0])):
-            pol4[0, 0, guess] = 0.0
-        if not first_block:
-            pol2[0, 0, pos_one] = 1.0
-        pol4[0, 0, ort_one] = 1.0
-
-        pol3 = torch.clamp(pol3, min=-1., max=1.)
-        pol5 = torch.clamp(pol5, min=-1., max=1.)
-
-        return pol2, pol3, pol4, pol5
-
     def clamp(self, p1, p2):
         pol1 = p1.clone()
         pol2 = p2.clone()
@@ -123,19 +84,20 @@ class ActionInference():
 
         return pol1, pol2
 
-    def predict(self, state, block, orientationnum, first_block, current_block=None, testing=False):
+    def predict(self, state, block, actionnum, orientationnum, first_block, current_block=None, testing=False):
 
         # Forward pass over policy
-        #position = self._policy2.view(1, 13)
+        # position = self._policy2.view(1, 13)
         if first_block:
-            self._policy1 = torch.zeros([1, 1, 3]).to(device="cuda")
-        position = self._policy1
+            self._policy1 = torch.zeros([1, 1, 2]).to(device="cuda")
+        position = actionnum
+        position = torch.cat((position, self._policy1), dim=-1)
         position = torch.cat((position, orientationnum), dim=-1)
-        position = torch.cat((position, self._policy2), dim=-1).view(1, 9)
+        position = torch.cat((position, self._policy2), dim=-1).view(1, 10)
         x = self._model(state, block, position, ai=self.attention, first_block=first_block, testing=testing)
         return x
 
-    def action_inference(self, x, target, block, orientationnum, current_blocks_in_game, first_block,
+    def action_inference(self, x, target, block, orientationnum, actionnum, current_blocks_in_game, first_block,
                          current_block=None, testing=False):
         """Optimize the current policy.
 
@@ -170,9 +132,10 @@ class ActionInference():
         assert (x.size(1) == 1), "batch of x should be 1"
 
         assert (len(target.shape) == 3), "target should be of shape (seq_len, batch, output_size)"
-        #assert (target.size(0) <= self._policy1.size(
+        # assert (target.size(0) <= self._policy1.size(
         #    0)), "seq_len of target should be less than or equal to seq_len of policy"
-        assert (target.size(0) <= self._policy2.size(0)), "seq_len of target should be less than or equal to seq_len of policy"
+        assert (target.size(0) <= self._policy2.size(
+            0)), "seq_len of target should be less than or equal to seq_len of policy"
         assert (target.size(1) == 1), "batch of target should be 1"
 
         if self._reset_optimizer:
@@ -187,14 +150,17 @@ class ActionInference():
             self._optimizer2.zero_grad()
 
             # Forward pass
-            output = self.predict(x, block, orientationnum, first_block, current_block=current_block, testing=testing)
+            output = self.predict(x, block, actionnum, orientationnum, first_block, current_block=current_block,
+                                  testing=testing)
 
             # Compute loss
-            loss = self._criterion(output.view(1, self.block_sz + 3), target.view(1, self.block_sz + 3),
-                                   blocks=current_blocks_in_game, test=True, added=True)
+            if first_block:
+                loss = self._criterion(output.view(1, self.block_sz), target.view(1, self.block_sz),
+                                       blocks=current_blocks_in_game, test=False, first=True)
+            else:
+                loss = self._criterion(output.view(1, self.block_sz), target.view(1, self.block_sz),
+                                       blocks=current_blocks_in_game, test=True)
             loss = loss.mean()
-            #print(i)
-            #print("loss: " + str(loss))
 
             # Backward pass
             self._model.zero_grad()
@@ -202,39 +168,21 @@ class ActionInference():
             if not first_block:
                 self._optimizer1.step()
             self._optimizer2.step()
-
-            #print("block: " + str(self._policy1))
-
             self._policy1.data, self._policy2.data = self.clamp(self._policy1.data, self._policy2.data)
-            #self._policy2.data, self._policy3.data, self._policy4.data, self._policy5.data = self.recreate_action(
-            #    self._policy2.data, self._policy3.data, self._policy4.data, self._policy5.data, first_block=first_block)
 
         # Policy have been optimized; this optimized policy is now propagated
         # once more in forward direction in order to generate the final output
         # to be returned
         with torch.no_grad():
-            output = self.predict(x, block, orientationnum, first_block, current_block=current_block, testing=testing)
+            output = self.predict(x, block, actionnum, orientationnum, first_block, current_block=current_block,
+                                  testing=testing)
 
         # Save optimized policy to return
         policy1 = self._policy1.clone()
         policy2 = self._policy2.clone()
 
-        #policy1 = self.recreate_onehot(policy1)
-        #policy2, policy3, policy4, policy5 = self.recreate_action(policy2, policy3, policy4, policy5, first_block=first_block)
-        #print("action: " + str(policy2))
-        #if first_block:
-        #    policy1 = current_block
-
-            # Shift policy, last entry is duplicated
-            #with torch.no_grad():
-            #    self._policy1[:-1] = self._policy1[1:].clone()
-            #    self._policy2[:-1] = self._policy2[1:].clone()
-
-        #print(policy1)
-        #print(policy2)
-        #print(target)
-        #print(block)
-        action = torch.cat((policy1, orientationnum), dim=-1)
+        action = torch.cat((actionnum, policy1), dim=-1)
+        action = torch.cat((action, orientationnum), dim=-1)
         action = torch.cat((action, policy2), dim=-1)
 
         return action, output

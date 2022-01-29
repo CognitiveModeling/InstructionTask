@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import net_test
+#import net_test
 import json
 import os
 import time
@@ -11,7 +11,7 @@ import math
 import actioninference as AI
 import mathown
 import attention_net
-import net
+#import net
 import random
 
 with open('test_states.json') as json_file:
@@ -30,11 +30,12 @@ n_size = 1
 n_color = 3
 n_type = 1
 n_position = 3
+n_position_state = 4
 n_orientations = 6
 n_distances = 2
 action_size = n_position + n_orientations
 #n_single_state = n_position + n_orientations + n_distances + n_size + n_type + n_color + n_status
-n_single_state = n_type + n_color + n_size + n_position + n_orientations + n_status
+n_single_state = n_type + n_color + n_size + n_position_state + n_orientations + n_status
 block_sz = n_agents * n_single_state
 
 n_test_samples = len(test_states)
@@ -80,7 +81,7 @@ block_sz = n_single_state * n_blocks
 state_sz = n_single_state
 blocks_in_game = []
 
-PATH = "state_dict_model_validation_4400samples_attention_001.pt"
+PATH = "state_dict_model_validation_attention_001.pt"
 
 net = attention_net.Net(batch_sz, n_blocks, timesteps, vector_dim=128).to(device="cuda")
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
@@ -253,7 +254,7 @@ if clientID!=-1:
             # print(state)
             # print(target)
 
-            random_tests = 2000
+            random_tests = 1000
 
             for trial in range(random_tests):
                 current_blocks_in_game = blocks_in_game.copy()

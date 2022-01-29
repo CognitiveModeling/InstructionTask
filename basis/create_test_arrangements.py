@@ -18,35 +18,8 @@ import json
 import mathown
 import math
 
-
-def same_position(po1, po2):
-    return po1[0] - 0.01 <= po2[0] <= po1[0] + 0.01 and po1[1] - 0.01 <= po2[1] <= po1[1] + 0.01 and po1[2] - 0.2 <= \
-           po2[2] <= po1[2] + 0.2
-
-
-def same_position_other_block(po1, po2):
-    return po1[0] - 0.2 <= po2[0] <= po1[0] + 0.2 and po1[1] - 0.2 <= po2[1] <= po1[1] + 0.2 and po1[2] - 0.1 <= \
-           po2[2] <= po1[2] + 0.1
-
-
-def same_orientation(po1, po2):
-    if po1[0] == po2[0] and po1[1] == po2[1] and po1[2] == po2[2]:
-        return po1[3] - 0.1 <= po2[3] <= po1[3] + 0.1 and po1[4] - 0.1 <= po2[4] <= po1[4] + 0.1
-
-
-def out_of_bounds(position):
-    return not (2.5 > position[0] > -2.5 and 2.5 > position[1] > -2.5)
-
-
-def correct_position(position):
-    if position[2] != -1 and position[2] < 0:
-        position[2] = 0
-    elif position[2] != -1 and position[2] != 0:
-        position[2] = position[2] + 0.01
-    return position
-
 n_blocks = 3
-n_actions = n_blocks + 2
+n_actions = n_blocks
 max_cu = 5
 max_cy = 0
 max_s = 0
@@ -107,16 +80,15 @@ if clientID!=-1:
     allshapes = [cuboid1, cuboid3, cuboid4, cuboid2, cuboid5, cylinder3, cylinder2, cylinder4, cylinder1, cylinder5,
                  sphere2, sphere1]
 
-    even_list = list(range(4590, 10000))
-    clean = False
+    even_list = list(range(0, 10))
 
     for j in even_list:
-        print("trial: " + str(j))
+        print(j)
 
         shapeslist = []
         rands = np.random.randint(3, size=n_blocks)
         actions = list(range(5))
-        #actions = [0]
+        #actions = [3, 3, 3, 3]
         actionChoices = random.choices(actions, k=n_actions)
         cu = 0
         cy = 0
@@ -155,16 +127,17 @@ if clientID!=-1:
         arrangement = []
 
         old_order = list(range(n_blocks))
-        np.random.shuffle(old_order)
+        #np.random.shuffle(old_order)
 
         first_block = old_order[0]
         old_order.remove(first_block)
+        order = old_order
 
-        add1 = np.random.choice(old_order)
-        add2 = np.random.choice(old_order)
+        #add1 = np.random.choice(old_order)
+        #add2 = np.random.choice(old_order)
 
-        order = list([old_order[0], old_order[1], add1, add2])
-        np.random.shuffle(order)
+        #order = list([old_order[0], old_order[1], add1, add2])
+        #np.random.shuffle(order)
 
         #print(first_block)
         #print(order)
@@ -203,24 +176,9 @@ if clientID!=-1:
 
         time.sleep(1)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-        last_orientations = []
-        last_positions = []
 
         for a in range(n_actions):
-            print(a)
             timestep = []
-
-            if a > 1:
-                new = shapeslist[order[a-2]].get_relative_position_old(shapeslist[first_block],
-                                                                       shapeslist[order[a-2]].getPosition(),
-                                                                       first=False)
-                if not same_position(position, new):
-                    print(new)
-                    print(position)
-                    shapeslist[order[a-2]].setPosition([-3.5, 3.5, 1], withoutAll[order[a-2]])
-                    sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-                    time.sleep(1)
-                    sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
             for s in range(len(shapeslist)):
                 shape = shapeslist[s]
@@ -230,110 +188,41 @@ if clientID!=-1:
                     properties.append(shape.getType())
                     properties.append(list(shape.getColor()))
                     properties.append([shape.getBoundingBox()[0]])
-                    properties.append(list(shape.get_relative_position_simple(shapeslist[first_block],
-                                                                              shape.getPosition(), True,
-                                                                              withoutAll[s])))
+                    properties.append(list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(), first=True)))
                     properties.append(list(shape.getOrientationType_simple()))
                     properties.append(list(shape.getDistances(withoutAll[s])))
 
                     timestep.append(list(properties))
-                    last_positions.append(shape.get_relative_position_old(shapeslist[first_block],
-                                                                              shape.getPosition(), True))
-                    last_orientations.append(shape.getOrientationType_simple())
                 else:
                     properties = []
                     properties.append(shape.getType())
                     properties.append(list(shape.getColor()))
                     properties.append([shape.getBoundingBox()[0]])
-                    new_pos = shape.get_relative_position_old(shapeslist[first_block], shape.getPosition(), first=False)
-                    if a == 1:
-                        print("shape:" + str(s))
-                        print("first")
-                        print(last_positions)
-                        #print(last_orientations)
-                        if s == first_block:
-                            properties.append(
-                                list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                       False, withoutAll[s])))
-                        elif not same_position_other_block(new_pos, last_positions[s]) or not \
-                                same_orientation(shape.getOrientationType_simple(), last_orientations[s]):
-                            shape.setVisualOrientation_simple(last_orientations[s])
-                            shape.set_relative_position_simple(last_positions[s], shapeslist[first_block],
-                                                               withoutAll[s])
-                            properties.append(
-                                list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                        False, withoutAll[s])))
-                    elif s == order[a-2]:
-                        print("shape:" + str(s))
-                        print("moved block fine")
-                        print(last_positions)
-                        properties.append(
-                            list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                    False, withoutAll[s])))
-
-                    elif s != first_block and (
-                                not same_position_other_block(new_pos, last_positions[s]) or not same_orientation(
-                            shape.getOrientationType_simple(), last_orientations[s])):
-                        print("shape:" + str(s))
-                        print("non moved block wrong")
-                        print(last_positions)
-                        print(new_pos)
-                        #print(last_orientations)
-                        shape.setVisualOrientation_simple(last_orientations[s])
-                        shape.set_relative_position_simple(last_positions[s], shapeslist[first_block],
-                                                           withoutAll[s])
-                        sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-                        time.sleep(1)
-                        sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
-                        properties.append(
-                            list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                    False, withoutAll[s])))
-                    else:
-                        print("shape:" + str(s))
-                        print("non moved block fine")
-                        print(last_positions)
-                        #print(last_orientations)
-                        properties.append(
-                            list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                    False, withoutAll[s])))
+                    properties.append(list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(), first=False)))
                     properties.append(list(shape.getOrientationType_simple()))
                     properties.append(list(shape.getDistances(withoutAll[s])))
 
                     timestep.append(list(properties))
-                    last_positions[s] = correct_position(shape.get_relative_position_old(shapeslist[first_block],
-                                                                                         shape.getPosition(), False))
-                    last_orientations[s] = shape.getOrientationType_simple()
-
-            sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-            time.sleep(2)
-            sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
             fx = 0
             fy = 0
 
             orientation_type = [0, 0, 0]
 
-            type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]
-            type_choice = np.random.choice(type)
+            #type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
+            #type_choice = np.random.choice(type)
+            type_choice = 0
 
             orientation_type[type_choice] = 1
 
             facing_choices = [0, 0, 0]
             facing = [1, 0]
 
-            if type_choice == 0:
-                facing_choices[0] = np.random.uniform(- 1, 1)
-                facing_choices[1] = math.sin(math.acos(facing_choices[0]))
-                if random.randint(0, 1) == 0:
-                    facing_choices[1] = -facing_choices[1]
-            elif type_choice == 1:
-                facing_choices[0] = np.random.uniform(- 1, 1)
-                facing_choices[1] = math.sin(math.acos(facing_choices[0]))
-                if random.randint(0, 1) == 0:
-                    facing_choices[1] = -facing_choices[1]
-                facing = [0, 1]
-                facing_choice = random.choice(facing)
-                facing_choices[2] = facing_choice
+            facing_choices[0] = np.random.uniform(- 1, 1)
+            facing_choices[1] = math.sin(math.acos(facing_choices[0]))
+            if random.randint(0, 1) == 0:
+                facing_choices[1] = -facing_choices[1]
+
 
 
             if a == 0:
@@ -371,10 +260,9 @@ if clientID!=-1:
                 arrangement.append(list(timestep))
 
             else:
-                leftright = np.random.uniform(-0.5, 0.5)
-                frontback = np.random.uniform(-0.5, 0.5)
-                up = np.random.uniform(- 0.3, 0.2)
-                print("up: " + str(up))
+                leftright = np.random.uniform(-0.1, 0.1)
+                frontback = np.random.uniform(-0.1, 0.1)
+                up = np.random.uniform(0, 0.1)
                 shapeslist[order[a-1]].moveTo(2, 2, [])
                 shapeslist[order[a-1]].setVisualOrientation_simple([orientation_type[0], orientation_type[1],
                                                                     orientation_type[2], facing_choices[0],
@@ -385,19 +273,8 @@ if clientID!=-1:
                 #orientation = list([o1, o2, o3, o4, o5, o6])
                 #orientation = shapeslist[order[a-1]].getOrientationType()
                 action = j % 5
-                #position = shapeslist[order[a - 1]].perform_random_simple_action(shapeslist[first_block],
-                #                                                                 action, leftright, frontback, up,
-                #
-                #                                                                 withoutAll[order[a - 1]])
-                if not clean:
-                    position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], actionChoices[a],
-                                                                              leftright, frontback, up,
-                                                                               withoutAll[order[a-1]])
-                else:
-                    position = shapeslist[order[a - 1]].perform_random_simple_action_alt(shapeslist[first_block],
-                                                                                     actionChoices[a],
-                                                                                     leftright, frontback, up,
-                                                                                     withoutAll[order[a - 1]])
+                position = shapeslist[order[a-1]].perform_random_simple_action(shapeslist[first_block], action,
+                                                                              leftright, frontback, up, withoutAll[order[a-1]])
 
                 #print(shapeslist[order[a-1]])
                 #print(withoutAll[order[a-1]])
@@ -421,17 +298,7 @@ if clientID!=-1:
 
                 arrangement.append(list(timestep))
 
-
         timestep = []
-        new = shapeslist[order[-1]].get_relative_position_old(shapeslist[first_block],
-                                                              shapeslist[order[-1]].getPosition(), first=False)
-        if not same_position(position, new):
-            print(new)
-            print(position)
-            shapeslist[order[-1]].setPosition([-3.5, 3.5, 1], withoutAll[order[-1]])
-            sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-            time.sleep(1)
-            sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
         for s in range(len(shapeslist)):
             shape = shapeslist[s]
@@ -440,30 +307,7 @@ if clientID!=-1:
             properties.append(shape.getType())
             properties.append(list(shape.getColor()))
             properties.append([shape.getBoundingBox()[0]])
-
-            new_pos = shape.get_relative_position_old(shapeslist[first_block], shape.getPosition(), first=False)
-            if s == order[-1]:
-                print("shape:" + str(s))
-                print("moved block fine")
-                print(last_positions)
-                properties.append(list(shape.get_relative_position_simple(shapeslist[first_block],
-                                                                          shape.getPosition(), False,
-                                                                          withoutAll[s])))
-            elif s != first_block and (not same_position_other_block(new_pos, last_positions[s]) or not same_orientation(
-                        shape.getOrientationType_simple(), last_orientations[s])):
-                print("shape:" + str(s))
-                print("non moved block wrong")
-                shape.setVisualOrientation_simple(last_orientations[s])
-                shape.set_relative_position_simple(last_positions[s], shapeslist[first_block],
-                                                   withoutAll[s])
-                sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-                time.sleep(1)
-                sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
-            else:
-                print("shape:" + str(s))
-                print("non moved block fine")
-                properties.append(list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(),
-                                                                          False, withoutAll[s])))
+            properties.append(list(shape.get_relative_position_simple(shapeslist[first_block], shape.getPosition(), first=False)))
             properties.append(list(shape.getOrientationType_simple()))
             properties.append(list(shape.getDistances(withoutAll[s])))
 
@@ -476,7 +320,7 @@ if clientID!=-1:
 
         arrangement.append(list(timestep))
 
-        with open("arrangements/arrangement" + str(j) + ".json", 'w') as f:
+        with open("../test_arrangements/arrangement" + str(j) + ".json", 'w') as f:
             json.dump(list(arrangement), f, indent=2)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 

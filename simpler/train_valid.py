@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import net_test
+#import net_test
 import json
 import os
 import time
@@ -11,7 +11,7 @@ import math
 import actioninference as AI
 import mathown
 import attention_net
-import net
+#import net
 import random
 import csv
 
@@ -253,7 +253,7 @@ if clientID != -1:
 
         print(str(epoch) + " training loss: " + str(mean_loss.item()) + " validation loss: " + str(mean_validation_loss.item()))
 
-        PATH = "state_dict_model_validation_4400samples_attention_001.pt"
+        PATH = "state_dict_model_validation_attention_001.pt"
 
         # Save
         torch.save(net.state_dict(), PATH)
@@ -438,9 +438,9 @@ if clientID != -1:
 
                         #p = np.random.randint(0, 5)
 
-                        p1 = np.random.uniform(-.8, .8)
-                        p2 = np.random.uniform(-.8, .8)
-                        p3 = np.random.uniform(0, 0.8)
+                        p1 = np.random.uniform(-1, 1)
+                        p2 = np.random.uniform(-1, 1)
+                        p3 = np.random.uniform(0, 1)
 
                         current_block = torch.zeros([1, n_blocks])
                         block_choice = np.random.choice(all_blocks)
@@ -643,7 +643,7 @@ if clientID != -1:
             'execloss': mean_test_loss.item()
         }
 
-        with open('training_progression_4400_0.001_nozpenalty.csv', mode='a') as csv_file:
+        with open('training_progression_0.001.csv', mode='a') as csv_file:
             fieldnames = ['epoch', 'trainloss', 'validloss', 'predloss', 'execloss']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
