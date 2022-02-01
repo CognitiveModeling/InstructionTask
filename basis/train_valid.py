@@ -29,8 +29,8 @@ with open('test_states_target.json') as json_file:
 with open('test_states.json') as json_file:
     test_states = json.load(json_file)
 
-validation_sz = 2300
-n_samples = 4600 * 5
+validation_sz = 800
+n_samples = 1760 * 5
 n_train_samples = n_samples - validation_sz
 
 orig_states = torch.FloatTensor(orig_states).to(device="cuda")
@@ -38,16 +38,16 @@ orig_states_target = torch.FloatTensor(orig_states_target).to(device="cuda")
 orig_positions = torch.FloatTensor(orig_positions).to(device="cuda")
 orig_agents = torch.FloatTensor(orig_agents).to(device="cuda")
 
-batch_sz = 100
+batch_sz = 200
 n_agents = 3
 n_status = 1
 n_size = 1
 n_color = 3
-n_positions = 4
+n_positions = 3
 n_positions_state = 6
 n_orientations = 6
 n_distances = 2
-action_size = n_positions + n_orientations
+action_size = n_positions + n_orientations + n_agents
 n_single_state = n_color + n_size + n_positions_state + n_orientations + n_status
 block_sz = n_agents * n_single_state
 
@@ -182,7 +182,7 @@ if clientID != -1:
         ######### TESTING ###################################
         #####################################################
         if epoch % 30 == 0 and epoch != 0:
-            #blocks_in_game = []
+            # blocks_in_game = []
             prediction_losses = []
             test_losses = []
 
@@ -194,7 +194,7 @@ if clientID != -1:
                 cy = 0
                 s = 0
 
-                #blocks_in_game = []
+                # blocks_in_game = []
 
                 reshape = []
                 arrangement = []
@@ -307,22 +307,26 @@ if clientID != -1:
                         # if trial % 1 == 0:
                         # print("test trial " + str(trial))
                         # print("current loss: " + str(current_loss))
-                        po = torch.zeros([1, action_size]).to(device="cuda")
-
-                        p2 = np.random.uniform(-1, 1)
-                        p3 = np.random.uniform(-1, 1)
-                        p1 = np.random.choice([0, 1])
-                        possible_blocks = all_blocks.copy()
-                        if not current_blocks_in_game:
-                            p0 = -1
-                        else:
-                            p0 = np.random.choice(current_blocks_in_game)
-                            possible_blocks.remove(p0)
-
                         current_block = torch.zeros([n_blocks])
-                        block_choice = np.random.choice(possible_blocks)
+                        block_choice = np.random.choice(all_blocks)
                         current_block[block_choice] = 1
                         current_block = current_block.view(1, 1, n_blocks).to(device="cuda")
+
+                        po = torch.zeros([1, action_size]).to(device="cuda")
+
+                        p2 = np.random.uniform(-.7, .7)
+                        p3 = np.random.uniform(-.7, .7)
+                        p1 = np.random.choice([0, 1])
+                        possible_blocks = current_blocks_in_game.copy()
+                        if block_choice in possible_blocks:
+                            possible_blocks.remove(block_choice)
+
+                        if not possible_blocks:
+                            p0 = [-1, -1, -1]
+                        else:
+                            p0_choice = np.random.choice(possible_blocks)
+                            p0 = [0, 0, 0]
+                            p0[p0_choice] = 1
 
                         orientation_type = [1, 0, 0]
                         facing_choices = [0, 0, 0]
@@ -334,14 +338,14 @@ if clientID != -1:
 
                         if idx == 0:
                             po[0] = torch.tensor(
-                                [-1, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2],
+                                [-1, -1, -1, 0, 0, 0, orientation_type[0], orientation_type[1], orientation_type[2],
                                  facing_choices[0], facing_choices[1], facing_choices[2]])
                         else:
                             po[0] = torch.tensor(
-                                [p0, p1, p2, p3, orientation_type[0], orientation_type[1], orientation_type[2],
-                                 facing_choices[0], facing_choices[1], facing_choices[2]])
+                                [p0[0], p0[1], p0[2], p1, p2, p3, orientation_type[0], orientation_type[1],
+                                 orientation_type[2], facing_choices[0], facing_choices[1], facing_choices[2]])
 
-                        po = po.view(1, 1, n_positions + n_orientations).to(device="cuda")
+                        po = po.view(1, 1, n_positions + n_orientations + n_agents).to(device="cuda")
 
                         new_state = net(state, current_block, po, testing=True)
 
@@ -355,21 +359,21 @@ if clientID != -1:
                             current_best_block = current_block.to(device="cuda")
                             current_block_choice = block_choice
 
-                    #current_blocks_in_game = blocks_in_game.copy()
+                    # current_blocks_in_game = blocks_in_game.copy()
 
                     if idx == 0:
                         first_block = torch.argmax(current_best_block).item()
                     sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
-                    #current_blocks_in_game.append(torch.argmax(current_best_block).item())
+                    # current_blocks_in_game.append(torch.argmax(current_best_block).item())
 
                     new_position = current_action.view(action_size)
                     new_block = current_best_block.view(1, n_blocks).to(device="cuda")
-                    actionnum = torch.narrow(new_position, 0, 0, 2).view(1, 1, 2)
-                    orientationnum = torch.narrow(new_position, 0, n_positions, 3).view(1, 1, 3)
+                    actionnum = torch.narrow(new_position, 0, 0, 4).view(1, 1, 4)
+                    orientationnum = torch.narrow(new_position, 0, n_positions + n_agents, 3).view(1, 1, 3)
 
-                    policy1 = torch.narrow(new_position, 0, 2, 2).view(1, 1, 2)
-                    policy2 = torch.narrow(new_position, 0, n_positions + 3, 3).view(1, 1, 3)
+                    policy1 = torch.narrow(new_position, 0, 4, 2).view(1, 1, 2)
+                    policy2 = torch.narrow(new_position, 0, n_positions + n_agents + 3, 3).view(1, 1, 3)
 
                     optimizer1 = torch.optim.Adam([policy1], lr=0.001)
                     optimizer2 = torch.optim.Adam([policy2], lr=0.001)
@@ -394,11 +398,15 @@ if clientID != -1:
                                      action.view(1, action_size), testing=True)
 
                     block_nr = int(torch.argmax(new_block))
-                    #blocks_in_game.append(block_nr)
-                    #current_blocks_in_game = blocks_in_game.copy()
-                    ref = torch.narrow(action, 0, 0, 1)
-                    pos = torch.narrow(action, 0, 1, 3)
-                    ort = torch.narrow(action, 0, 4, 6)
+                    # blocks_in_game.append(block_nr)
+                    # current_blocks_in_game = blocks_in_game.copy()
+                    ref_tensor = torch.narrow(action, 0, 0, n_agents)
+                    if ref_tensor[0] == -1:
+                        ref = -1
+                    else:
+                        ref = int(torch.argmax(ref_tensor))
+                    pos = torch.narrow(action, 0, n_agents, 3)
+                    ort = torch.narrow(action, 0, n_positions + n_agents, 6)
 
                     sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
                     op = shapeslist[block_nr].getPosition()

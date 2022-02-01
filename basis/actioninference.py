@@ -93,7 +93,7 @@ class ActionInference():
         position = actionnum
         position = torch.cat((position, self._policy1), dim=-1)
         position = torch.cat((position, orientationnum), dim=-1)
-        position = torch.cat((position, self._policy2), dim=-1).view(1, 10)
+        position = torch.cat((position, self._policy2), dim=-1).view(1, 12)
         x = self._model(state, block, position, ai=self.attention, first_block=first_block, testing=testing)
         return x
 

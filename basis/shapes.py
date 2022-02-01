@@ -805,7 +805,7 @@ class Shape:
 
             else:
                 o_size = object.getBoundingBox()[0]
-                p = [op[0] + position[1], op[1] + position[2], op[2] + o_size * 0.5 + sbb[2] * 0.5]
+                p = [op[0] + position[1], op[1] + position[2], op[2] + o_size * 0.5 + sbb[2] * 0.5 + 0.1]
 
         self.setPosition(p, shapelist)
 

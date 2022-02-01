@@ -9,11 +9,11 @@ class Net(nn.Module):
         super(Net, self).__init__()
 
         self.n_blocks = n_agents
-        self.n_position = 4
+        self.n_position = 3
         self.n_position_state = 6
         self.n_orientation = 6
         self.n_distances = 2
-        self.n_action = self.n_orientation + self.n_position
+        self.n_action = self.n_orientation + self.n_position + n_agents
         self.n_color = 3
         self.n_blocknr = 1
         self.n_boundingbox = 1
@@ -105,7 +105,7 @@ class Net(nn.Module):
         return out
 
     def loss(self, output, target, blocks=None, test=False, first=False):
-
+        test = False
         if test:
             #remove duplicates
             blocks = list(dict.fromkeys(blocks))
