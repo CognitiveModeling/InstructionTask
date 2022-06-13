@@ -1,6 +1,12 @@
 *.json
-!states_relative.json
-!positions_relative.json
-!agents_relative.json
-!test_states_relative.json
+!states.json
+!states_target.json
+!positions.json
+!agents.json
+!test_states.json
+!test_states_target.json
 arrangements_relative/*
+mixed_arrangements/*
+sim.py
+simConst.py
+remoteApi.so

@@ -1,8 +1,0 @@
-train set: 90/ 10 validation set !!!!
-
-Graphik zu Fehlerentwicklung
-
-orientation verbessern
-
-Jun Tani nachlesen iros 2019
-Marc Toussaint
