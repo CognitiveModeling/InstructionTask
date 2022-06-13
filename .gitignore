@@ -7,6 +7,11 @@
 !test_states_target.json
 arrangements_relative/*
 mixed_arrangements/*
+instruction_generation/*
 sim.py
 simConst.py
 remoteApi.so
+
+__pycache__/
+*.py[cod]
+*$py.class
