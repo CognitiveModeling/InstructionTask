@@ -8,9 +8,9 @@
 arrangements_relative/*
 mixed_arrangements/*
 instruction_generation/*
-sim.py
-simConst.py
-remoteApi.so
+*sim.py
+*simConst.py
+*remoteApi.so
 
 __pycache__/
 *.py[cod]
