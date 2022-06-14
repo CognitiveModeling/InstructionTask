@@ -65,7 +65,7 @@ if clientID != -1:
     colors = [black, white, red, green, yellow, blue, brown, purple, pink, orange, gray, blueish, greenish, reddish,
               yellowish, brownish]
 
-    even_list = [9]
+    even_list = [11]
     clean = False
 
     for j in even_list:
@@ -84,6 +84,7 @@ if clientID != -1:
         left = random.choice(m)
         front = random.choice(m)
 
+        # sample shapes from the simulation
         for i in range(n_blocks):
             if rands[i] == 0:
                 if cu < max_cu:
@@ -120,6 +121,7 @@ if clientID != -1:
         sample = []
         withoutAll = []
 
+        # get lists which include all shapes except shape i respectively
         for n in range(n_blocks):
             withoutn = shapeslist.copy()
             withoutn.remove(shapeslist[n])
@@ -130,6 +132,7 @@ if clientID != -1:
 
         order = list(range(n_blocks))
 
+        # adapt size and color of each shape
         for shape in shapeslist:
 
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
@@ -164,12 +167,10 @@ if clientID != -1:
         time.sleep(1)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
-        leftright = float(np.random.uniform(-0.8, 0.8))
-        frontback = float(np.random.uniform(-0.8, 0.8))
-
         for a in range(n_actions):
             timestep = []
 
+            # save previous state
             for s in range(len(shapeslist)):
                 shape = shapeslist[s]
 
@@ -201,19 +202,17 @@ if clientID != -1:
                 if random.randint(0, 1) == 0:
                     rotation[1] = -rotation[1]
 
-            leftright = float(np.random.uniform(-0.8, 0.8))
-            frontback = float(np.random.uniform(-0.8, 0.8))
-            up = 0
+            left_right = float(np.random.uniform(-0.8, 0.8))
+            front_back = float(np.random.uniform(-0.8, 0.8))
+            up = 1
 
-            if a == 0:
-                up = 0
             if a == 1:
-                leftright = leftright + float(np.random.uniform(-0.05, 0.05))
-                frontback = frontback + float(np.random.uniform(-0.05, 0.05))
+                left_right = left_right + float(np.random.uniform(-0.05, 0.05))
+                front_back = front_back + float(np.random.uniform(-0.05, 0.05))
 
             if a == 2:
-                leftright = leftright + float(np.random.uniform(-0.05, 0.05))
-                frontback = frontback + float(np.random.uniform(-0.05, 0.05))
+                left_right = left_right + float(np.random.uniform(-0.05, 0.05))
+                front_back = front_back + float(np.random.uniform(-0.05, 0.05))
 
             shapeslist[order[a]].move_to(2, 2, [])
 
@@ -222,18 +221,18 @@ if clientID != -1:
             shapeslist[order[a]].set_visual_orientation_simple([orientation_type[0], orientation_type[1],
                                                                 orientation_type[2], rotation[0],
                                                                 rotation[1]])
-
+            # first set rotation
             orientation = list([orientation_type[0], orientation_type[1], orientation_type[2], rotation[0],
                                 rotation[1]])
-
-            position = shapeslist[order[a]].set_position([leftright, frontback, up], withoutAll[order[a]])
+            # then set position
+            position = shapeslist[order[a]].set_position([left_right, front_back, up], withoutAll[order[a]])
 
             time.sleep(1)
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
             time.sleep(2)
 
             sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
-
+            # save action
             properties = [[int(order[a])], list(position), list(orientation)]
 
             timestep.append(list(properties))
@@ -241,7 +240,7 @@ if clientID != -1:
             arrangement.append(list(timestep))
 
         timestep = []
-
+        # get resulting state
         for s in range(len(shapeslist)):
             shape = shapeslist[s]
 
@@ -263,11 +262,11 @@ if clientID != -1:
         input()
 
         arrangement.append(list(timestep))
-
+        # save
         with open("test_arrangements/arrangement" + str(j) + ".json", 'w') as f:
             json.dump(list(arrangement), f, indent=2)
         sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
-
+        # reset shapes
         for i in range(len(shapeslist)):
             shapeslist[i].scale_shape(reshape[i][0], reshape[i][1], reshape[i][2])
             shapeslist[i].turn_original_way_up()

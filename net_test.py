@@ -7,10 +7,9 @@ import numpy as np
 import sim
 import math
 import actioninference as AI
-import attention_net
+import relative_net
 import random
 
-batch_sz = 200
 n_agents = 3
 n_status = 1
 n_size = 1
@@ -24,57 +23,62 @@ n_single_state_no_type = n_single_state - n_type
 block_sz = n_agents * n_single_state
 
 
+# adds margin of slack to equal function
 def same_as(v1, v2):
     return v2 - 0.05 < v1 < v2 + 0.05
 
 
-def arrange_samples(states_batch, blocks_batch, targets_batch=None, test=False):
-    if test:
-        batch_size = 1
-    else:
-        batch_size = batch_sz
-    current_block = torch.argmax(blocks_batch, dim=-1)
-    blockses = torch.tensor([0, 1, 2]).to(device="cuda")
-    blockses = blockses.repeat(batch_size, 1)
-    mask = torch.ones_like(blockses).scatter_(1, current_block.unsqueeze(1), 0.)
-    blockses = blockses[mask.bool()].view(batch_size, 2)
+# arranges test samples in a way the network can read
+def arrange_samples(states_batch, blocks_batch, targets_batch=None):
+    batch_size = 1
 
+    # IDs of blocks not chosen
+    curr_block = torch.argmax(blocks_batch, dim=-1)
+    blocks = torch.tensor([0, 1, 2]).to(device="cuda")
+    blocks = blocks.repeat(batch_size, 1)
+    mask = torch.ones_like(blocks).scatter_(1, curr_block.unsqueeze(1), 0.)
+    blocks = blocks[mask.bool()].view(batch_size, 2)
+
+    # ID of chosen block
     block_ids = torch.argmax(blocks_batch, dim=-1)
 
-    other_block_states = torch.ones(batch_size, n_agents, n_single_state).to(device="cuda") * -1
+    # tensor filled with -1
+    remaining_block_states = torch.ones(batch_size, n_agents, n_single_state).to(device="cuda") * -1
 
+    # identifying one-hot vectors for all blocks
     block_a = torch.zeros(batch_size, n_agents).to(device="cuda")
-    block_a.scatter_(1, blockses[:, 0].view(batch_size, 1), torch.ones(batch_size, n_agents - 1).to(device="cuda"))
+    block_a.scatter_(1, blocks[:, 0].view(batch_size, 1), torch.ones(batch_size, n_agents - 1).to(device="cuda"))
 
     block_b = torch.zeros(batch_size, n_agents).to(device="cuda")
-    block_b.scatter_(1, blockses[:, 1].view(batch_size, 1), torch.ones(batch_size, n_agents - 1).to(device="cuda"))
+    block_b.scatter_(1, blocks[:, 1].view(batch_size, 1), torch.ones(batch_size, n_agents - 1).to(device="cuda"))
 
     block_id = torch.zeros(batch_size, n_agents).to(device="cuda")
     block_id.scatter_(1, block_ids.view(batch_size, 1), torch.ones(batch_size, n_agents - 1).to(device="cuda"))
 
+    # masks with single state length, filled with 1s for all entries of the respective block
     block_a = torch.repeat_interleave(block_a.long(), n_single_state, dim=-1).view(batch_size, n_agents,
                                                                                    n_single_state)
     block_b = torch.repeat_interleave(block_b.long(), n_single_state, dim=-1).view(batch_size, n_agents,
                                                                                    n_single_state)
     block_id = torch.repeat_interleave(block_id.long(), n_single_state, dim=-1).view(batch_size, n_agents,
                                                                                      n_single_state)
-    other_block_states = torch.where(block_a == 1, states_batch, other_block_states)
-    other_block_states = torch.where(block_b == 1, states_batch, other_block_states)
 
-    if test:
-        this_block_target = targets_batch[block_id == 1].view(batch_size, n_single_state)
-        b_type = this_block_target[:, n_single_state_no_type:]
-        this_block_target = this_block_target[:, :(n_positions + n_orientations)]
-    else:
-        this_block_target = None
-        b_type = None
+    # fill the tensor with only the information of the non chosen blocks, leaving -1 for all entries of the chosen block
+    remaining_block_states = torch.where(block_a == 1, states_batch, remaining_block_states)
+    remaining_block_states = torch.where(block_b == 1, states_batch, remaining_block_states)
 
-    return other_block_states, this_block_target, b_type
+    # get only the target position for the chosen block as well as its shape type as a one-hot vector
+    chosen_block_target = targets_batch[block_id == 1].view(batch_size, n_single_state)
+    block_type = chosen_block_target[:, n_single_state_no_type:]
+    chosen_block_target = chosen_block_target[:, :(n_positions + n_orientations)]
+
+    return remaining_block_states, chosen_block_target, block_type
 
 
+# load model and samples
 PATH = "models/state_dict_model_current_mixed.pt"
 
-net = attention_net.Net(1, vector_dim=64).to(device="cuda")
+net = relative_net.Net(1, vector_dim=64).to(device="cuda")
 net.load_state_dict(torch.load(PATH, map_location=torch.device("cuda")))
 net.eval()
 
@@ -96,6 +100,7 @@ test_states_target = test_states_target.view(n_test_samples, n_agents, n_single_
 if not os.path.exists('eval_results'):
     os.makedirs('eval_results')
 
+# prepare and start simulation (taken from CoppeliaSim)
 print('Program started')
 sim.simxFinish(-1)  # just in case, close all opened connections
 clientID = sim.simxStart('127.0.0.1', 19999, True, True, 5000, 5)  # Connect to CoppeliaSim
@@ -127,8 +132,6 @@ if clientID != -1:
         py = 0
         co = 0
 
-        # blocks_in_game = []
-
         reshape = []
         arrangement = []
         timestep = []
@@ -141,6 +144,7 @@ if clientID != -1:
         target = test_states_target[i_batch, :]
         target = target.view(1, n_agents, n_single_state)
 
+        # read shape types from data and select corresponding blocks in the simulation
         for i in range(n_blocks):
             if state[0, i, 13] == 1:
                 shapeslist.append(shapes.Shape(clientID, "Cuboid", cu))
@@ -160,11 +164,14 @@ if clientID != -1:
 
         withoutAll = []
 
+        # create lists of shapes, with item i missing in each respective list
+
         for idx in range(n_blocks):
             without = shapeslist.copy()
             without.remove(shapeslist[idx])
             withoutAll.append(without)
 
+        # go through list of shapes and adapt size and color according to sample data
         for i_shape in range(n_blocks):
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
@@ -201,10 +208,11 @@ if clientID != -1:
             print(idx)
             current_loss = 1000
             if idx == 0:
-                current_blocks_not_in_game = all_blocks.copy()
+                current_blocks_not_in_game = all_blocks.copy() # if first trial, all blocks are not in game yet
 
             else:
                 current_blocks_not_in_game = []
+                # read current game state, including positions of all blocks and determine which are in the game
                 for bl in range(0, n_blocks):
                     p_help = shapeslist[bl].get_raw_position()
                     if shapes.out_of_bounds(p_help):
@@ -217,8 +225,8 @@ if clientID != -1:
                     c = shapeslist[bl].get_color()
                     bb = shapeslist[bl].get_bounding_box()[0]
                     t = shapeslist[bl].get_type()
-                    type = [0, 0, 0, 0, 0]
-                    type[t] = 1
+                    b_type = [0, 0, 0, 0, 0]
+                    b_type[t] = 1
                     if bl == 0:
                         state = torch.zeros(1, 1, block_sz).to(device="cuda")
                     p[2] = p[2] - bb * 0.5
@@ -238,28 +246,23 @@ if clientID != -1:
                     state[0][0][bl * n_single_state + 10] = c[1]
                     state[0][0][bl * n_single_state + 11] = c[2]
                     state[0][0][bl * n_single_state + 12] = status
-                    state[0][0][bl * n_single_state + 13] = type[0]
-                    state[0][0][bl * n_single_state + 14] = type[1]
-                    state[0][0][bl * n_single_state + 15] = type[2]
-                    state[0][0][bl * n_single_state + 16] = type[3]
-                    state[0][0][bl * n_single_state + 17] = type[4]
-
-                # hidden = current_hidden
+                    state[0][0][bl * n_single_state + 13] = b_type[0]
+                    state[0][0][bl * n_single_state + 14] = b_type[1]
+                    state[0][0][bl * n_single_state + 15] = b_type[2]
+                    state[0][0][bl * n_single_state + 16] = b_type[3]
+                    state[0][0][bl * n_single_state + 17] = b_type[4]
 
             state = state.view(1, n_blocks, n_single_state)
-            # print(state)
-            # print(target)
 
+            # grid search: perform predictions for randomly generated actions, always keep the one action with
+            # the best prediction
             for trial in range(random_tests):
-
-                # actionsequence = torch.zeros([test_seq_len, 1, n_positions]).to(device="cuda")
                 blocks_choice = torch.zeros([n_blocks]).to(device="cuda")
 
                 if trial % 1000 == 0:
                     print("grid search")
-                # if trial % 1 == 0:
-                # print("test trial " + str(trial))
-                # print("current loss: " + str(current_loss))
+
+                # choose block to be moved, position, and orientation for next move
                 current_block = torch.zeros([n_blocks])
                 block_choice = np.random.choice(current_blocks_not_in_game)
                 current_block[block_choice] = 1
@@ -288,12 +291,15 @@ if clientID != -1:
                 po = po.view(1, action_size).to(device="cuda")
                 current_block = current_block.view(1, n_agents).to(device="cuda")
 
-                other_block_states, this_block_target, b_type = arrange_samples(state, current_block, target, test=True)
+                # adapt sample data to fit network
+                other_block_states, this_block_target, b_type = arrange_samples(state, current_block, target)
 
+                # compute predicted future state via network
                 new_state = net(other_block_states, po, b_type, testing=True)
 
-                loss = net.loss(new_state.view(1, action_size), this_block_target.view(1, action_size))
+                loss = relative_net.loss(new_state.view(1, action_size), this_block_target.view(1, action_size))
 
+                # check if loss is smaller than all previous losses; if so, save current data
                 if loss.mean() < current_loss:
                     current_loss = loss.mean().to(device="cuda")
                     current_full_loss = loss.clone().to(device="cuda")
@@ -301,43 +307,38 @@ if clientID != -1:
                     current_best_block = current_block.to(device="cuda")
                     current_block_choice = block_choice
 
-            # current_blocks_in_game = blocks_in_game.copy()
-
-            if idx == 0:
-                first_block = torch.argmax(current_best_block).item()
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
-            # current_blocks_in_game.append(torch.argmax(current_best_block).item())
-
-            other_block_states, this_block_target, b_type = arrange_samples(state, current_best_block, target,
-                                                                            test=True)
+            # adapt best data once again to fit network
+            other_block_states, this_block_target, b_type = arrange_samples(state, current_best_block, target)
 
             new_position = current_action.view(action_size)
             new_block = current_best_block.view(1, n_blocks).to(device="cuda")
-            orientationnum = torch.narrow(new_position, 0, n_positions, 3).view(1, 1, 3)
+            orientation_num = torch.narrow(new_position, 0, n_positions, 3).view(1, 1, 3)
 
+            # set action inference policies to be adapted, choosing action determined by grid search
             policy1 = torch.narrow(new_position, 0, 0, n_positions).view(1, 1, n_positions)
             policy2 = torch.narrow(new_position, 0, n_positions + 3, 2).view(1, 1, 2)
 
+            # set action inference optimizers
             optimizer1 = torch.optim.Adam([policy1], lr=0.001)
             optimizer2 = torch.optim.Adam([policy2], lr=0.001)
 
-            ai = AI.ActionInference(net, policy1, policy2, optimizer1, optimizer2, net.loss,
-                                    attention=True)
-            # print(idx)
-            # print(target)
+            # define action inference object
+            ai = AI.ActionInference(net, policy1, policy2, optimizer1, optimizer2, relative_net.loss)
 
+            # execute action inference
             action, _ = ai.action_inference(other_block_states.view(1, 1, block_sz),
                                             this_block_target.view(1, 1, action_size),
-                                            orientationnum, b_type, testing=True)
+                                            orientation_num, b_type, testing=True)
 
             action = action.view(1, action_size)
+
+            # compute prediction of definite action create by action inference
             prediction = net(other_block_states.view(1, 1, n_agents, n_single_state),
                              action.view(1, 1, action_size), b_type, ai=True, testing=True, printing=True)
 
             block_nr = int(torch.argmax(new_block))
-            # blocks_in_game.append(block_nr)
-            # current_blocks_in_game = blocks_in_game.copy()
             action = action.view(action_size)
             pos = torch.narrow(action, 0, 0, n_positions)
             pos_old = pos.clone()
@@ -353,6 +354,7 @@ if clientID != -1:
 
             pos[2] = pos[2] + shapeslist[block_nr].get_bounding_box()[0] * 0.5
 
+            # set position as determined by action inference
             shapeslist[block_nr].set_position(pos, withoutAll[block_nr])
 
             print("prev state: " + str(state))
@@ -364,8 +366,8 @@ if clientID != -1:
 
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
             time.sleep(2)
-            # sim.simxPauseSimulation(clientID, sim.simx_opmode_blocking)
 
+            # get resulting state of simulation
             for bl in range(0, n_blocks):
                 p_help = shapeslist[bl].get_raw_position()
                 if shapes.out_of_bounds(p_help):
@@ -378,8 +380,8 @@ if clientID != -1:
                 c = shapeslist[bl].get_color()
                 bb = shapeslist[bl].get_bounding_box()[0]
                 t = shapeslist[bl].get_type()
-                type = [0, 0, 0, 0, 0]
-                type[t] = 1
+                b_type = [0, 0, 0, 0, 0]
+                b_type[t] = 1
                 if bl == 0:
                     state = torch.zeros(1, 1, block_sz).to(device="cuda")
                 p[2] = p[2] - bb * 0.5
@@ -399,18 +401,15 @@ if clientID != -1:
                 state[0][0][bl * n_single_state + 10] = c[1]
                 state[0][0][bl * n_single_state + 11] = c[2]
                 state[0][0][bl * n_single_state + 12] = status
-                state[0][0][bl * n_single_state + 13] = type[0]
-                state[0][0][bl * n_single_state + 14] = type[1]
-                state[0][0][bl * n_single_state + 15] = type[2]
-                state[0][0][bl * n_single_state + 16] = type[3]
-                state[0][0][bl * n_single_state + 17] = type[4]
-
-                # state = state.view(1, block_sz_target).to(device="cuda")
+                state[0][0][bl * n_single_state + 13] = b_type[0]
+                state[0][0][bl * n_single_state + 14] = b_type[1]
+                state[0][0][bl * n_single_state + 15] = b_type[2]
+                state[0][0][bl * n_single_state + 16] = b_type[3]
+                state[0][0][bl * n_single_state + 17] = b_type[4]
 
             sim.simxStartSimulation(clientID, sim.simx_opmode_blocking)
 
-        input()
-
+        # reset all blocks
         for i in range(len(shapeslist)):
             shapeslist[i].scale_shape(reshape[i][0], reshape[i][1], reshape[i][2])
             shapeslist[i].turn_original_way_up()
@@ -421,7 +420,8 @@ if clientID != -1:
     # Now send some data to CoppeliaSim in a non-blocking fashion:
     sim.simxAddStatusbarMessage(clientID, 'Hello CoppeliaSim!', sim.simx_opmode_oneshot)
 
-    # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive. You can guarantee this with (for example):
+    # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
+    # You can guarantee this with (for example):
     sim.simxGetPingTime(clientID)
 
     # Now close the connection to CoppeliaSim:

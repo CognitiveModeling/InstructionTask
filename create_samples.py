@@ -4,6 +4,7 @@ import json
 # creates samples out of the arrangements, correcting for differences in format
 
 
+# adds margin of slack to equal function
 def same_as(v1, v2):
     return v2 - 0.02 < v1 < v2 + 0.02
 
@@ -13,10 +14,6 @@ s = list(range(0, 8400))
 
 n_agents = 3
 n_actions = 5
-n_positions = 3
-n_state_positions = 4
-n_orientations = 6
-counter = 0
 states = []
 states_target = []
 agents = []

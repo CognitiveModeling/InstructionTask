@@ -1,9 +1,9 @@
 import torch
 import json
-import attention_net
+import relative_net
 import random
 
-# trains the net 'attention net' with the data from "datasets"
+# trains the net 'relative net' with the data from "datasets"
 
 batch_sz = 200
 n_agents = 3
@@ -20,26 +20,31 @@ block_sz = n_agents * n_single_state
 
 
 # arranges the samples in a form the model can read
-def arrange_samples(states_batch, blocks_batch, targets_batch):
-    current_block = torch.argmax(blocks_batch, dim=-1)
-    blocks = torch.tensor([0, 1, 2]).to(device="cuda")
-    blocks = blocks.repeat(batch_sz, 1)
-    mask = torch.ones_like(blocks).scatter_(1, current_block.unsqueeze(1), 0.)
-    blocks = blocks[mask.bool()].view(batch_sz, 2)
+def arrange_samples(states_current, blocks_current, targets_current):
+    # IDs of blocks not chosen
+    current_block = torch.argmax(blocks_current, dim=-1)
+    other_blocks = torch.tensor([0, 1, 2]).to(device="cuda")
+    other_blocks = other_blocks.repeat(batch_sz, 1)
+    mask = torch.ones_like(other_blocks).scatter_(1, current_block.unsqueeze(1), 0.)
+    other_blocks = other_blocks[mask.bool()].view(batch_sz, 2)
 
-    block_ids = torch.argmax(blocks_batch, dim=-1)
+    # ID of chosen block
+    block_ids = torch.argmax(blocks_current, dim=-1)
 
-    other_block_states = torch.ones(batch_sz, n_agents, n_single_state).to(device="cuda") * -1
+    # tensor filled with -1
+    remaining_block_states = torch.ones(batch_sz, n_agents, n_single_state).to(device="cuda") * -1
 
+    # identifying one-hot vectors for all blocks
     block_a = torch.zeros(batch_sz, n_agents).to(device="cuda")
-    block_a.scatter_(1, blocks[:, 0].view(batch_sz, 1), torch.ones(batch_sz, n_agents - 1).to(device="cuda"))
+    block_a.scatter_(1, other_blocks[:, 0].view(batch_sz, 1), torch.ones(batch_sz, n_agents - 1).to(device="cuda"))
 
     block_b = torch.zeros(batch_sz, n_agents).to(device="cuda")
-    block_b.scatter_(1, blocks[:, 1].view(batch_sz, 1), torch.ones(batch_sz, n_agents - 1).to(device="cuda"))
+    block_b.scatter_(1, other_blocks[:, 1].view(batch_sz, 1), torch.ones(batch_sz, n_agents - 1).to(device="cuda"))
 
     block_id = torch.zeros(batch_sz, n_agents).to(device="cuda")
     block_id.scatter_(1, block_ids.view(batch_sz, 1), torch.ones(batch_sz, n_agents - 1).to(device="cuda"))
 
+    # masks with single state length, filled with 1s for all entries of the respective block
     block_a = torch.repeat_interleave(block_a.long(), n_single_state, dim=-1).view(batch_sz, n_agents,
                                                                                    n_single_state)
     block_b = torch.repeat_interleave(block_b.long(), n_single_state, dim=-1).view(batch_sz, n_agents,
@@ -47,16 +52,19 @@ def arrange_samples(states_batch, blocks_batch, targets_batch):
     block_id = torch.repeat_interleave(block_id.long(), n_single_state, dim=-1).view(batch_sz, n_agents,
                                                                                      n_single_state)
 
-    other_block_states = torch.where(block_a == 1, states_batch, other_block_states)
-    other_block_states = torch.where(block_b == 1, states_batch, other_block_states)
+    # fill the tensor with only the information of the non chosen blocks, leaving -1 for all entries of the chosen block
+    remaining_block_states = torch.where(block_a == 1, states_current, remaining_block_states)
+    remaining_block_states = torch.where(block_b == 1, states_current, remaining_block_states)
 
-    this_block_target = targets_batch[block_id == 1].view(batch_sz, n_single_state)
-    b_type = this_block_target[:, n_single_state_no_type:]
-    this_block_target = this_block_target[:, :(n_positions + n_orientations)]
+    # get only the target position for the chosen block as well as its shape type as a one-hot vector
+    chosen_block_target = targets_current[block_id == 1].view(batch_sz, n_single_state)
+    block_type = chosen_block_target[:, n_single_state_no_type:]
+    chosen_block_target = chosen_block_target[:, :(n_positions + n_orientations)]
 
-    return other_block_states, this_block_target, b_type
+    return remaining_block_states, chosen_block_target, block_type
 
 
+# open training datasets
 with open('datasets/states.json') as json_file:
     orig_states = json.load(json_file)
 with open('datasets/states_target.json') as json_file:
@@ -76,7 +84,7 @@ orig_positions = torch.FloatTensor(orig_positions).to(device="cuda")
 orig_agents = torch.FloatTensor(orig_agents).to(device="cuda")
 
 # network
-net = attention_net.Net(batch_sz, vector_dim=64).to(device="cuda")
+net = relative_net.Net(batch_sz, vector_dim=64).to(device="cuda")
 
 # optimizer
 optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
@@ -92,7 +100,7 @@ validation_samples_list = list(range(n_train_samples, n_samples))
 
 for epoch in range(1000):
 
-    # get samples
+    # get samples both for training and validation
     random.shuffle(samples_list)
     samples = torch.LongTensor(samples_list)
     validation_samples = torch.LongTensor(validation_samples_list)
@@ -140,13 +148,15 @@ for epoch in range(1000):
         # reformat samples
         other_block_states, this_block_target, b_type = arrange_samples(states_batch, blocks_batch, targets_batch)
 
+        # forward pass through network
         out = net(other_block_states, positions_batch, b_type)
 
-        loss = net.loss(out.view(batch_sz, (n_positions + n_orientations)),
-                        this_block_target.view(batch_sz, (n_positions + n_orientations)))
+        # compute loss
+        loss = relative_net.loss(out.view(batch_sz, (n_positions + n_orientations)),
+                                 this_block_target.view(batch_sz, (n_positions + n_orientations)))
 
         loss = loss.mean()
-
+        # backward pass
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -156,20 +166,22 @@ for epoch in range(1000):
     mean_loss = torch.cat([e for e in losses], -1)
     mean_loss = mean_loss.mean()
 
-    # validation
+    # start validation
 
     validation_states_batch = validation_states[:, 0, :, :]
     validation_positions_batch = validation_positions[:, 0, :]
     validation_blocks_batch = validation_blocks[:, 0, :]
     validation_targets_batch = validation_states_target[:, 0, :]
 
+    # reformat samples
     other_block_states, this_block_target, b_type = arrange_samples(validation_states_batch, validation_blocks_batch,
                                                                     validation_targets_batch)
-
+    # forward pass
     out = net(other_block_states, validation_positions_batch, b_type)
 
-    validation_loss = net.loss(out.view(batch_sz, (n_positions + n_orientations)),
-                               this_block_target.view(batch_sz, (n_positions + n_orientations)))
+    # get loss
+    validation_loss = relative_net.loss(out.view(batch_sz, (n_positions + n_orientations)),
+                                        this_block_target.view(batch_sz, (n_positions + n_orientations)))
 
     validation_loss = validation_loss.mean()
 
@@ -178,5 +190,5 @@ for epoch in range(1000):
 
     PATH = "models/state_dict_model_current_mixed.pt"
 
-    # Save
+    # save model
     torch.save(net.state_dict(), PATH)

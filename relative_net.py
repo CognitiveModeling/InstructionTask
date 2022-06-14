@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class Net(nn.Module):
@@ -14,23 +13,18 @@ class Net(nn.Module):
         self.n_orientation = 5
         self.n_action = self.n_orientation + self.n_position
         self.n_color = 3
-        self.n_blocknr = 1
-        self.n_boundingbox = 1
+        self.n_bounding_box = 1
         self.n_status = 1
         self.vector_dim = vector_dim
-        self.reduced_state = self.n_color + self.n_boundingbox + self.n_status
-        self.single_state = self.n_color + self.n_boundingbox + self.n_orientation + self.n_status
+        self.single_state = self.n_color + self.n_bounding_box + self.n_orientation + self.n_status
         self.single_state_target = self.single_state + self.n_position + self.n_type
-        self.single_state_target_notype = self.single_state + self.n_position
-        self.n_state = self.n_blocks * self.single_state
-        self.n_state_target = self.n_blocks * self.single_state_target
+        self.single_state_target_no_type = self.single_state + self.n_position
         self.batch_sz = batch_sz
-        self.values = torch.zeros(self.batch_sz, self.n_blocks, self.vector_dim).to(device="cuda")
-        self.table = torch.zeros(batch_sz, self.n_orientation + self.n_boundingbox).to(device="cuda")
-        self.table_ai = torch.zeros(1, self.n_orientation + self.n_boundingbox).to(device="cuda")
+        self.table = torch.zeros(batch_sz, self.n_orientation + self.n_bounding_box).to(device="cuda")
+        self.table_ai = torch.zeros(1, self.n_orientation + self.n_bounding_box).to(device="cuda")
 
         # network
-        self.l1 = nn.Linear(self.n_orientation + self.n_boundingbox + self.n_action, self.vector_dim)
+        self.l1 = nn.Linear(self.n_orientation + self.n_bounding_box + self.n_action, self.vector_dim)
         self.l1b = nn.Linear(self.vector_dim, self.vector_dim)
         self.l1c = nn.Linear(self.vector_dim, self.vector_dim)
         self.l2a = nn.Linear(self.vector_dim, self.n_action)
@@ -105,7 +99,7 @@ class Net(nn.Module):
 
         return relative_positions
 
-    def forward(self, states, action, type, ai=False, testing=False, printing=False):
+    def forward(self, states, action, b_type, ai=False, testing=False):
         if ai:
             action = action.view(1, 1, self.n_action)
             states = states.view(1, self.n_blocks, self.single_state_target)
@@ -119,19 +113,19 @@ class Net(nn.Module):
 
         new_action = self.relative_positions(states, action, testing)
 
-        types = torch.narrow(states, -1, self.single_state_target_notype, self.n_type)
-        states = torch.narrow(states, -1, 0, self.single_state_target_notype)
+        types = torch.narrow(states, -1, self.single_state_target_no_type, self.n_type)
+        states = torch.narrow(states, -1, 0, self.single_state_target_no_type)
 
         first = torch.cat((new_action[:, self.n_blocks], table), dim=-1)
         first = torch.tanh(self.l1(first))
         first = torch.tanh(self.l1b(first))
-        type_a = self.type_a(type)
+        type_a = self.type_a(b_type)
         first = first * type_a
         first = torch.tanh(self.l1c(first))
         w_table = torch.sigmoid(self.l2b(first))
         v_table = self.l2a(first)
 
-        states = states[:, :, self.n_position:(self.n_position + self.n_orientation + self.n_boundingbox)]
+        states = states[:, :, self.n_position:(self.n_position + self.n_orientation + self.n_bounding_box)]
 
         a = states[:, 0]
         b = states[:, 1]
@@ -143,7 +137,7 @@ class Net(nn.Module):
 
         w_a, w_b, w_c, v_a, v_b, v_c = self.weight_vector(a, b, c, new_action, mask_a.view(batch_sz, 1),
                                                           mask_b.view(batch_sz, 1), mask_c.view(batch_sz, 1), batch_sz,
-                                                          types, type)
+                                                          types, b_type)
 
         residuals = w_table * v_table + w_a * v_a + w_b * v_b + w_c * v_c
 
@@ -151,8 +145,9 @@ class Net(nn.Module):
 
         return out
 
-    def loss(self, output, target):
 
-        loss = F.mse_loss(output, target, reduction="none")
+def loss(output, target):
 
-        return loss
+    loss = F.mse_loss(output, target, reduction="none")
+
+    return loss
