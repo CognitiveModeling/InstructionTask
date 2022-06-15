@@ -1,6 +1,6 @@
 # InstructionTask
 
-Network that learns spatial relationships between building blocks in a CoppeliaSim simulation. The network predicts a block's resulting position, given a position where it is being released on the field. It takes into account positions and rotations of all other blocks in the game, recognizing when an intended position is impossible (i.e. colliding with the ground or another block).
+Network that learns spatial relationships between building blocks in a CoppeliaSim simulation. The network predicts a block's resulting position, given a position where it is being released on the field. It takes into account positions and rotations of all other blocks in the game, recognizing when an intended position is impossible (i.e. colliding with the ground or another block). Hence the network learns which blocks need to be placed first in order to reach a certain target arrangement of blocks.
 
 Preparation:
 The simulation is run using CoppeliaSim's legacy remote Python API (https://www.coppeliarobotics.com/helpFiles/en/legacyRemoteApiOverview.htm). 

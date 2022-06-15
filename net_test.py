@@ -336,7 +336,7 @@ if clientID != -1:
 
             # compute prediction of definite action create by action inference
             prediction = net(other_block_states.view(1, 1, n_agents, n_single_state),
-                             action.view(1, 1, action_size), b_type, ai=True, testing=True, printing=True)
+                             action.view(1, 1, action_size), b_type, ai=True, testing=True)
 
             block_nr = int(torch.argmax(new_block))
             action = action.view(action_size)

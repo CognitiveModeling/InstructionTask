@@ -188,7 +188,7 @@ for epoch in range(1000):
     print(str(epoch) + " training loss: " + str(mean_loss.item()) + " validation loss: " + str(
         validation_loss.item()))
 
-    PATH = "models/state_dict_model_current_mixed.pt"
+    PATH = "models/state_dict_model_current_mixed_test.pt"
 
     # save model
     torch.save(net.state_dict(), PATH)
