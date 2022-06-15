@@ -24,4 +24,10 @@ create_test_arrangements.py: creates arrangements for testing
 
 create_test_samples.py: creates samples for testing out of testing arrangements
 
+net_test.py: tests a trained network on the test database
+
+relative_net.py: holds the network class and structure
+
 shapes.py: holds class Shape, representing block objects in the simulation, as well as all necessary functions to interact with them
+
+train.py: trains the network relative net on the samples from database
